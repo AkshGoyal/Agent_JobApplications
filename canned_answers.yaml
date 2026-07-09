@@ -1,0 +1,29 @@
+# canned_answers.yaml — my approved answers to recurring application questions.
+# The `answer` CLI command must prefer these verbatim/adapted over generating
+# fresh. Empty values mean: system must ask me, never guess.
+
+logistics:
+  notice_period: "2 months"            # TODO e.g. "30 days"
+  current_ctc: "17 LPA"              # TODO — decide your disclosure policy too
+  expected_ctc: "25 LPA"             # TODO or a range
+  earliest_start_date: ""      # TODO
+  willing_to_relocate: "yes"      # TODO true/false + any exceptions
+  preferred_locations: ["Bangalore", "Hyderabad", "Mumbai","Delhi"]      # TODO
+  work_authorization: "Indian citizen; authorized to work in India"
+  requires_sponsorship_abroad: ""   # TODO for any non-India targets
+  remote_preference: "Hybrid/ On site"        # TODO onsite / hybrid / remote
+
+standard_questions:
+  why_are_you_leaving_current_role: "I am looking for an opportunity that offers greater scope for impact and alignment with my long-term career goals."    # TODO — your words
+  biggest_strength: ""                    # TODO
+  biggest_weakness: ""                    # TODO
+  where_in_5_years: ""                    # TODO
+
+policies:
+  # Rules the generator must always follow
+  - Never state or imply a CGPA other than the true values in facts.yaml
+  - Never claim experience with a tool/skill absent from facts.yaml
+  - Salary questions: use expected_ctc above; if blank, flag for me instead
+    of answering
+  - Any question about gaps, grades, or reasons for leaving: use my canned
+    framing above; if blank, draft nothing and ask me

@@ -1,0 +1,155 @@
+# facts.yaml — single source of truth about me.
+# Generation modules may ONLY use facts from this file, narratives.md,
+# and canned_answers.yaml. Never invent facts not present here.
+# canonical_source: latest CV (2025) where the two CVs differ.
+
+identity:
+  name: Aksh Goyal
+  email: aksh.iitdelhi@gmail.com
+  phone: "6239330822"
+  linkedin: "https://www.linkedin.com/in/akshgoyal/"            # TODO: paste full profile URL
+  location: Pune, India   # TODO: confirm current city
+
+education:
+  - institute: Indian Institute of Technology Delhi
+    location: New Delhi, India
+    degree: B.Tech in Textile Engineering
+    years: 2021-2025
+    cgpa: 6.62            # from institute records CV; forms may ask — do not omit or round up
+  - institute: Indian Institute of Technology Delhi
+    degree: Minor Degree, Business Management
+    years: 2021-2025
+    cgpa: 8.8             # latest CV (old CV said 8.75 at 12/20 credits — 8.8 is canonical)
+    notes: Courses include Mergers & Acquisitions, Microeconomics, Managerial
+      Accounting & Financial Management, Marketing Management, Management of
+      Small & Medium Scale Industrial Enterprises, Intro to Computer Science
+  - board: CBSE, Class XII, 2021, 96.6%
+    school: Ryan International School
+  - board: CBSE, Class X, 2019, 95.6%
+    school: Ryan International School
+
+experience:
+  - company: Aspect Ratio
+    role: Analyst
+    period: Jun 2025 - Present
+    domain: Consulting / AI for a Big Pharma client (US pharmaceutical company)
+    on_cv:
+      - Architected production RAG system (chatbot for marketing research)
+        using OpenAI APIs; hybrid retrieval combining semantic vector search
+        with keyword-based BM25 and routing agents
+      - Conducted state-of-the-art RAG research; evaluated chunking,
+        embeddings, and search strategies
+      - Built evaluation framework and structured PDF extraction; achieved
+        94% accuracy
+    supplementary_not_on_cv:   # provided verbally; usable in cover letters / form answers
+      - Delivered multiple consulting projects for the Big Pharma client
+      - Built solutions with Microsoft PowerApps
+      - Built Microsoft (SharePoint) sites
+      - Substantial strategy work for the client's teams
+      # TODO: add 1-2 concrete outcomes/metrics for the supplementary items —
+      # they are currently too vague to generate strong bullets from
+
+  - company: Grant Thornton Bharat LLP
+    role: "Summer Trainee: Public Sector Consulting"
+    location: New Delhi
+    period: May 2024 - Jul 2024
+    project: Large-scale human resource deployment project for a major
+      government department
+    bullets:
+      - Developed Power BI dashboard to track resource deployment status and
+        project metrics, state-wise and designation-wise
+      - Performed data analysis on monthly performance reports to identify
+        leave trends and calculate penalties
+      - Compiled 2000+ compliance documents for 287 deployed resources for
+        client submission
+    recognition: Letter of Recommendation from Associate Director
+
+  - company: Grant Thornton Bharat LLP        # earlier project, on old CV only
+    role: Summer Trainee (prior engagement)
+    period: May 2023 - Jul 2023
+    project: Citizen services delivery platform for a state government
+    bullets:
+      - Mapped and integrated citizen datasets using Alteryx; created unified
+        state citizen database
+      - Built Tableau service-delivery dashboard (district/block-wise services
+        applied and delivered) for quarterly state-leadership review, covering
+        15+ citizen schemes
+      - Documented CM statements and activities for PR team; accompanied
+        delegation to G20 conference (Shillong)
+
+projects:
+  - name: GEO Optimization
+    date: Jul 2025
+    bullets:
+      - Built GEO optimization engine transforming webpages into LLM-retrieval
+        optimized content
+      - Evaluated 150+ synthetic LLM queries; improved AI citation by 41%
+  - name: E-commerce Sales Insights Analysis
+    date: Jan 2025
+    bullets:
+      - Constructed Power BI dashboard evaluating critical e-commerce metrics
+        to drive strategic business decisions
+      - Applied Power Query and DAX data manipulation for high-impact
+        visualizations
+  - name: Market Entry of a New Luxury Apparel Brand
+    date: Feb 2024 - Jun 2024
+    supervisor: Prof. Biswajita Parida
+    bullets:
+      - Conducted primary and secondary research including consumer and store
+        manager interviews and industry analysis
+      - Developed Go-to-Market strategy including marketing plan and marketing
+        mix
+
+leadership:
+  - role: Coordinator, Tryst, CAIC, IIT Delhi
+    period: Jan 2024 - Apr 2024
+    bullets:
+      - Led a 3-tier team of 30 executives for orchestration of events
+      - Strategized and executed guest lecture series for Tryst 2024 with
+        high-profile speakers
+      - Coordinated stakeholders (industry experts, faculty) to align event
+        content with industry trends
+  - role: Senior Member, ShARE, SAC, IIT Delhi   # "Junior Member" on old CV; latest CV canonical
+    period: Jun 2022 - May 2023
+    selectivity: One of 8 selected among 100+ applicants
+    bullets:
+      - Created event flow and questionnaire for Private Equity panel;
+        moderated panel of 4 senior professionals
+      - Approached 20+ MBB Partners/Directors; onboarded 2 for a consulting
+        talk (old CV)
+  - role: Marketing Activity Head, Rendezvous, IIT Delhi
+    period: Jun 2022 - May 2023
+    bullets:
+      - Pitched 100+ companies; drafted proposals, MOUs, agreements
+      - Led team of 5 managing 15+ sponsor companies' expectations
+  - role: Corporate Relations Executive, Student Incubation Cell, IIT Delhi
+    period: Jun 2022 - May 2023
+  - role: Team Head, Tryst, CAIC, IIT Delhi
+    period: Jul 2021 - May 2022
+    bullets:
+      - Managed 5+ sponsor companies' deliverables; approached 30+ companies
+        via LinkedIn
+
+achievements:
+  - JEE Mains 2021 Rank 794 — top 0.07% of 10 lakh+ candidates
+  - NTSE Stage-1 cleared — top 0.002% among 50,000+ students
+  - Pre-RMO cleared (Mathematics Teachers' Association)
+  - SOF International Maths Olympiad — Gold Medal, International Rank 1327
+  - Accenture Data Analytics and Visualization Job Simulation
+
+skills:
+  ai: [LangChain, OpenAI API, RAG, Agentic Workflows, Prompt Engineering,
+       Fine-tuning]
+  search: [Hybrid Retrieval, BM25, Semantic Search, Chunking, Embedding Models]
+  data: [Power BI, Power Query, DAX, Tableau, Alteryx]
+  microsoft: [PowerApps, SharePoint sites]        # supplementary, not on CV
+  consulting: [Primary/secondary research, Go-to-Market strategy,
+               Stakeholder management, Compliance documentation]
+
+targets:                      # drives relevance ranking — fill carefully
+  roles: [AI Product Manager,AI Engineer, AI Developer, Founder's Office Role]                   # TODO: e.g. [AI Product Analyst, Associate Consultant, ...]
+  industries: [AI/ML, Startups, Pharma, Consumer based, Commerce]              # TODO: e.g. [AI/ML, Consulting, Pharma commercial]
+  geographies: [Anywhere works, preferebly Bangalore,Hyderabad, Mumbai]             # TODO: e.g. [Delhi NCR, Bengaluru, Remote India]
+  seniority: entry / 0-2 years
+  company_types: [AI startups, Product Companies, E commerce, Quick Commerce]           # TODO: e.g. [AI startups, MBB/Big4, product companies]
+  dealbreakers: []            # TODO: anything that should auto-score a job low
