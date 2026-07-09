@@ -2,16 +2,9 @@
 
 import sqlite3
 
-import pytest
-
 from db import database, repo
 
-
-@pytest.fixture
-def conn(tmp_path):
-    c = database.connect(tmp_path / "test.db")
-    yield c
-    c.close()
+# The `conn` fixture (fresh migrated temp DB) comes from tests/conftest.py.
 
 
 def test_migration_is_idempotent(tmp_path):
