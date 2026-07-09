@@ -98,16 +98,25 @@ about me.
 
 **Phase 1 — vertical slice (build this first, nothing else):**
 1. Repo scaffold, config, DB schema + migrations, profile KB templates I fill in
-2. ONE job source module: <FILL IN: e.g. a specific job board RSS/API or one
-   company careers page>
+2. ONE job source module: manual capture from LinkedIn. A CLI command
+   `ingest paste` takes a job URL + the job description pasted as text, and
+   uses an LLM to extract structured fields (company, title, location,
+   remote type, posted date) into the database. The raw pasted text is stored
+   verbatim as `description_text`. Never scrape or log into LinkedIn.
 3. Ingest → normalize → dedup → store
 4. LLM relevance ranking against my profile (score + 2–3 line rationale)
-5. CLI: `ingest`, `list --min-score 70`, `show <job_id>`
-6. Tests for parsing, dedup, and the ranking prompt's I/O contract
+5. CLI: `ingest paste`, `rank`, `list --min-score 70`, `show <job_id>`
+6. Tests for parsing, dedup, and the extraction/ranking prompts' I/O contracts
 
 **Phase 2 — generation:**
 - `tailor <job_id>` → CV bullet suggestions + cover letter draft as Markdown
   files under `output/<company>-<job_id>/`
+  - CV output must match the style of `profile/cv_canonical.pdf`: the same
+    five sections (Education / Professional Experience / Projects /
+    Leadership & Organizational Roles / Extracurriculars & Accolades) and the
+    same bullet style (em-dash bullets, concise, key terms bolded,
+    metric-led). It suggests better bullets for existing entries; it never
+    invents new sections, and every bullet must be traceable to `profile/`.
 - `answer <job_id> "question text"` → drafted form answer grounded in profile
 - Log all generated assets to `generated_asset`
 
