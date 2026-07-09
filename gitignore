@@ -1,0 +1,25 @@
+# Secrets — NEVER commit
+.env
+*.key
+secrets/
+
+# Database (contains your real job + personal data; also binary)
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated application materials (your tailored CVs, cover letters)
+output/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/
