@@ -31,7 +31,7 @@ def test_capture_sends_url_and_jd_and_keeps_text_verbatim():
     assert SAMPLE_URL in client.last_prompt
     assert "Acme AI Labs is building retrieval-augmented" in client.last_prompt
     assert client.calls[-1]["model"] == config.MODEL
-    assert client.calls[-1]["output_format"] is ExtractedJobFields
+    assert client.calls[-1]["config"].response_schema is ExtractedJobFields
 
     # Output contract: fields land on the posting; JD is stored verbatim.
     assert posting.company_name == "Acme AI Labs"
@@ -46,8 +46,8 @@ def test_capture_raises_on_unparseable_output():
         manual_paste.capture(SAMPLE_URL, SAMPLE_JD, client=client)
 
 
-def test_capture_raises_on_refusal():
-    client = FakeLLMClient(make_response(None, stop_reason="refusal"))
+def test_capture_raises_on_blocked_prompt():
+    client = FakeLLMClient(make_response(None, blocked=True))
     with pytest.raises(llm.LLMError):
         manual_paste.capture(SAMPLE_URL, SAMPLE_JD, client=client)
 

@@ -10,12 +10,14 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent
 
 # --- LLM settings -----------------------------------------------------------
-# The anthropic SDK reads ANTHROPIC_API_KEY from the environment itself;
+# The google-genai SDK reads GEMINI_API_KEY from the environment itself;
 # we never store the key in code or in the database.
-API_KEY_ENV_VAR = "ANTHROPIC_API_KEY"
+API_KEY_ENV_VAR = "GEMINI_API_KEY"
 
 # One model for all Phase 1 calls (extraction + ranking). Change here only.
-MODEL = os.environ.get("JOBSEARCH_MODEL", "claude-opus-4-8")
+# gemini-2.5-flash is fast, low-cost, and strong at structured JSON output —
+# the right fit for field extraction + 0-100 relevance scoring.
+MODEL = os.environ.get("JOBSEARCH_MODEL", "gemini-2.5-flash")
 MAX_TOKENS = 2048
 
 # --- Paths ------------------------------------------------------------------
@@ -27,5 +29,5 @@ OUTPUT_DIR = REPO_ROOT / "output"  # Phase 2: generated materials (gitignored)
 
 
 def api_key_present() -> bool:
-    """True if an Anthropic API key is available in the environment."""
+    """True if a Gemini API key is available in the environment."""
     return bool(os.environ.get(API_KEY_ENV_VAR))

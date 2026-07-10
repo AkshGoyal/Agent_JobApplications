@@ -8,18 +8,19 @@ from db import database
 
 
 class FakeLLMClient:
-    """Mimics anthropic.Anthropic just enough for llm.call().
+    """Mimics google.genai.Client just enough for llm.call().
 
-    Takes one or more canned responses; each parse() call consumes the next
-    one (the last response repeats). Records every call's kwargs in .calls.
+    Takes one or more canned responses; each generate_content() call consumes
+    the next one (the last response repeats). Records every call's kwargs in
+    .calls. Tests inject this so they NEVER hit the live API.
     """
 
     def __init__(self, *responses):
         self._responses = list(responses)
         self.calls = []
-        self.messages = self  # so client.messages.parse resolves to self.parse
+        self.models = self  # so client.models.generate_content resolves here
 
-    def parse(self, **kwargs):
+    def generate_content(self, **kwargs):
         self.calls.append(kwargs)
         if len(self._responses) > 1:
             return self._responses.pop(0)
@@ -27,15 +28,24 @@ class FakeLLMClient:
 
     @property
     def last_prompt(self) -> str:
-        return self.calls[-1]["messages"][0]["content"]
+        return self.calls[-1]["contents"]
 
 
-def make_response(parsed_output, stop_reason="end_turn"):
-    """Build an object shaped like the SDK's parse() response."""
+def make_response(parsed, finish_reason="STOP", blocked=False):
+    """Build an object shaped like the google-genai generate_content response."""
+    prompt_feedback = SimpleNamespace(
+        block_reason="SAFETY" if blocked else None
+    )
+    candidate = SimpleNamespace(
+        finish_reason=SimpleNamespace(name=finish_reason),
+    )
     return SimpleNamespace(
-        parsed_output=parsed_output,
-        stop_reason=stop_reason,
-        usage=SimpleNamespace(input_tokens=100, output_tokens=50),
+        parsed=parsed,
+        candidates=[candidate],
+        prompt_feedback=prompt_feedback,
+        usage_metadata=SimpleNamespace(
+            prompt_token_count=100, candidates_token_count=50
+        ),
     )
 
 

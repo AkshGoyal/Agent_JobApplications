@@ -29,7 +29,7 @@ def test_rank_prompt_contains_profile_and_job(conn):
     assert "targets:" in prompt                     # profile facts present
     assert "Acme AI Labs" in prompt                 # job company present
     assert "retrieval-augmented" in prompt          # JD text present
-    assert client.calls[-1]["output_format"] is RankingResult
+    assert client.calls[-1]["config"].response_schema is RankingResult
 
     # Output contract: score + rationale persisted, status advanced.
     assert ranked.score == 85
