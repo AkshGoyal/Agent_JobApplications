@@ -89,9 +89,9 @@ guessing when a canned answer is blank).
 - Every LLM call goes through `llm.py`; model settings only in `config.py`.
 - Prompts live in `prompts/` as readable template files.
 - Write tests alongside code — parsing and dedup logic especially. Tests
-  never hit the live API; mock the anthropic client.
+  never hit the live API; mock the Gemini client (`FakeLLMClient`).
 - When a design decision isn't covered by the spec, ask — don't assume.
-- Secrets only via environment variables (`ANTHROPIC_API_KEY`); never
+- Secrets only via environment variables (`GEMINI_API_KEY`); never
   committed. Never commit the SQLite DB or `output/` (see `.gitignore`).
 
 ## Dev setup
@@ -99,8 +99,8 @@ guessing when a canned answer is blank).
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...
-pytest                     # offline, mocked LLM
+export GEMINI_API_KEY=...   # from Google AI Studio; never commit this
+pytest                     # offline, mocked LLM — no key needed
 ```
 
 Smoke test (needs a real API key):

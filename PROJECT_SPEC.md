@@ -42,8 +42,8 @@ leave room for them without building them now.
 - Python 3.11+, managed with a virtualenv and `requirements.txt`
 - SQLite via the standard library (`sqlite3`) or SQLAlchemy Core if justified
 - `httpx` + `beautifulsoup4` / `feedparser` for fetching and parsing sources
-- Anthropic API (`anthropic` SDK) for all LLM calls; model name and settings
-  in a single config module so they can be changed in one place
+- Google Gemini API (`google-genai` SDK) for all LLM calls; model name and
+  settings in a single config module so they can be changed in one place
 - `click` or `typer` for the CLI
 - `pytest` for tests
 - Profile knowledge base: YAML + Markdown files in `profile/` (human-editable,
