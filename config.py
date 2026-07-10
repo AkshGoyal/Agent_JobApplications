@@ -15,9 +15,10 @@ REPO_ROOT = Path(__file__).resolve().parent
 API_KEY_ENV_VAR = "GEMINI_API_KEY"
 
 # One model for all Phase 1 calls (extraction + ranking). Change here only.
-# gemini-2.5-flash is fast, low-cost, and strong at structured JSON output —
-# the right fit for field extraction + 0-100 relevance scoring.
-MODEL = os.environ.get("JOBSEARCH_MODEL", "gemini-2.5-flash")
+# gemini-3.5-flash is the current GA flash-tier model — fast, low-cost, and
+# strong at structured JSON output, the right fit for field extraction and
+# 0-100 relevance scoring. (gemini-2.5-flash was retired for new API keys.)
+MODEL = os.environ.get("JOBSEARCH_MODEL", "gemini-3.5-flash")
 MAX_TOKENS = 2048
 
 # --- Paths ------------------------------------------------------------------
