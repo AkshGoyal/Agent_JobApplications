@@ -1,0 +1,23 @@
+AI Engineer
+Acme AI Labs · Bengaluru, Karnataka, India (Hybrid)
+Posted 2 weeks ago
+
+About the role
+Acme AI Labs is building retrieval-augmented generation products for
+enterprise customers. We are looking for an AI Engineer (0-2 years of
+experience) to design, build, and evaluate production RAG systems.
+
+What you'll do
+- Architect retrieval pipelines combining semantic vector search with
+  keyword-based methods (BM25)
+- Build evaluation frameworks for LLM outputs
+- Work with product and consulting teams to ship client-facing AI features
+
+What we're looking for
+- Hands-on experience with LLM APIs, prompt engineering, and agentic workflows
+- Experience with hybrid retrieval, chunking strategies, and embedding models
+- Strong communication skills; comfort working directly with clients
+
+Nice to have
+- Power BI or other analytics tooling
+- Experience in pharma or other regulated industries

@@ -1,0 +1,11 @@
+{
+  "name": "Job Search Assistant",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "postCreateCommand": "bash scripts/install_pkgs.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"]
+    }
+  },
+  "//": "Set a Codespaces secret named GEMINI_API_KEY (Settings -> Secrets and variables -> Codespaces). It is injected as an env var, so the CLI works interactively in the terminal: python -m cli.main ingest paste --url <URL> --rank"
+}

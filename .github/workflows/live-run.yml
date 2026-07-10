@@ -1,0 +1,57 @@
+name: Live run (Gemini smoke test)
+
+# A MANUAL run only — never fires on push. Click "Run workflow" in the Actions
+# tab to exercise the real Gemini flow on the bundled sample job description.
+# This spends your Gemini quota, so it is gated behind a button and a secret.
+#
+# Setup once: repo Settings -> Secrets and variables -> Actions ->
+#   New repository secret -> name: GEMINI_API_KEY, value: <your key>
+#
+# Note: the SQLite DB is gitignored and the runner is ephemeral, so anything
+# ingested here disappears when the run ends — this is a smoke test, not
+# persistent storage. Use a Codespace for real, ongoing use.
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Job posting URL to record with the sample JD"
+        required: false
+        default: "https://www.linkedin.com/jobs/view/123"
+
+jobs:
+  live-run:
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check the GEMINI_API_KEY secret is set
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::GEMINI_API_KEY secret is not set."
+            echo "Add it under Settings -> Secrets and variables -> Actions, then re-run."
+            exit 1
+          fi
+
+      - name: Ingest + rank the sample job
+        run: |
+          python -m cli.main ingest paste \
+            --url "${{ inputs.url }}" \
+            --file tests/fixtures/sample_jd.txt \
+            --rank
+
+      - name: List and show the stored job
+        run: |
+          python -m cli.main list --min-score 0
+          python -m cli.main show 1
