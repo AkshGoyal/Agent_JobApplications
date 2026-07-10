@@ -111,3 +111,17 @@ python -m cli.main ingest paste --url https://www.linkedin.com/jobs/view/123 \
 python -m cli.main list --min-score 0
 python -m cli.main show 1
 ```
+
+## Running on GitHub
+
+- **CI (`.github/workflows/ci.yml`)** runs `pytest` on every push/PR. Mocked —
+  no key, no Gemini calls, no cost.
+- **Live run (`.github/workflows/live-run.yml`)** is a manual "Run workflow"
+  button that exercises the real Gemini flow on the sample JD. Add the key
+  under **Settings → Secrets and variables → Actions** as `GEMINI_API_KEY`.
+  Spends quota only when triggered; the DB is ephemeral per run.
+- **Codespaces (`.devcontainer/`)** gives an interactive browser terminal for
+  real use (paste JDs, read rankings). Add the key under **Settings → Secrets
+  and variables → Codespaces** as `GEMINI_API_KEY`; it's injected as an env var.
+
+The key is never committed — only stored in GitHub secrets.
