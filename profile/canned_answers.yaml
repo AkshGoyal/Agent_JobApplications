@@ -23,7 +23,5 @@ policies:
   # Rules the generator must always follow
   - Never state or imply a CGPA other than the true values in facts.yaml
   - Never claim experience with a tool/skill absent from facts.yaml
-  - Salary questions: use expected_ctc above; if blank, flag for me instead
-    of answering
-  - Any question about gaps, grades, or reasons for leaving: use my canned
-    framing above; if blank, draft nothing and ask me
+  - "Salary questions: use expected_ctc above; if blank, flag for me instead of answering"
+  - "Any question about gaps, grades, or reasons for leaving: use my canned framing above; if blank, draft nothing and ask me"
