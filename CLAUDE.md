@@ -12,7 +12,9 @@ before making design decisions).
 - No LinkedIn automation of any kind (no scraping, no messaging, no login).
   Phase 1's only source is *manual paste*: I copy a JD from LinkedIn myself.
 - No email sending.
-- No web UI in early phases. CLI first.
+- No hosted/multi-user deployment. (The original "no web UI" rule was lifted
+  2026-07-11: a *local, single-user* web UI in `web/` wraps the same pipeline
+  functions as the CLI.)
 - No multi-agent frameworks (CrewAI, LangGraph, AutoGen, etc.). This is a
   deterministic pipeline with LLM calls at specific steps.
 
@@ -40,7 +42,8 @@ prompts/          # readable prompt template files (never scattered f-strings)
 db/               # migrations, connection, repository functions
 sources/          # one module per job source (Phase 1: manual_paste)
 pipeline/         # normalize → dedup → ingest → rank
-cli/              # Typer app: ingest paste, rank, list, show
+cli/              # Typer app: ingest paste, rank, list, show, status, status-report
+web/              # FastAPI app + single static page — same pipeline, in the browser
 profile/          # my knowledge base: facts.yaml, narratives.md, canned_answers.yaml, cv_canonical.pdf
 output/           # generated materials (gitignored; Phase 2)
 tests/            # pytest; LLM client is always mocked — no live API calls in tests
@@ -58,7 +61,20 @@ python -m cli.main ingest paste --url <URL> [--file jd.txt] [--rank]
 python -m cli.main rank [JOB_ID]
 python -m cli.main list [--min-score 70] [--status discovered]
 python -m cli.main show <JOB_ID>
+python -m cli.main status <JOB_ID> <STAGE>   # e.g. status 3 applied — always manual
+python -m cli.main status-report             # funnel counts per lifecycle stage
 ```
+
+## Web UI
+
+```bash
+python -m web.app        # http://localhost:8000 (Codespaces auto-forwards port 8000)
+```
+
+One static page over the same pipeline: paste a JD (add & rank), browse and
+filter the ranked table, open a job's detail/rationale, change its status,
+and see the funnel. The web layer (`web/app.py`) contains no business logic —
+it must stay a thin JSON wrapper over `pipeline/` and `db/repo.py`.
 
 `ingest paste` reads the JD from `--file` or stdin (paste, then Ctrl-D). It
 always **stores first, ranks after** — a failed LLM call must never lose a

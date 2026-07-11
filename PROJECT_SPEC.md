@@ -17,7 +17,9 @@ leave room for them without building them now.
 - No automated submission of applications, anywhere.
 - No LinkedIn automation of any kind (no scraping, no messaging, no login).
 - No email sending. (A future phase adds a human-approved outbox; not now.)
-- No web UI in early phases. CLI first.
+- ~~No web UI in early phases. CLI first.~~ *(Lifted 2026-07-11 by owner
+  decision: a local, single-user web UI now wraps the same pipeline functions
+  as the CLI — see `web/`. Still no hosted/multi-user deployment.)*
 - No multi-agent framework (CrewAI, LangGraph, AutoGen, etc.). This is a
   deterministic pipeline with LLM calls at specific steps, not an agent swarm.
 
@@ -58,6 +60,7 @@ generation/       # tailor CV bullets, cover letter, form-question answers (LLM)
 profile/          # my knowledge base (YAML facts + Markdown narratives)
 db/               # schema, migrations, repository functions
 cli/              # commands: ingest, rank, list, show, tailor, answer, status
+web/              # local single-user web UI (FastAPI + one static page) over the same pipeline
 config.py         # API keys via env vars, model settings, paths
 ```
 
@@ -120,11 +123,14 @@ about me.
 - `answer <job_id> "question text"` → drafted form answer grounded in profile
 - Log all generated assets to `generated_asset`
 
-**Phase 3 — tracking:**
-- Manual status transitions via CLI; `status-report` command showing the
-  funnel (discovered / applied / interviewing / etc.)
+**Phase 3 — tracking:** *(delivered 2026-07-11, ahead of Phase 2, alongside
+the web UI)*
+- Manual status transitions via CLI (`status <job_id> <stage>`) and web UI;
+  `status-report` command / funnel strip showing the funnel
+  (discovered / applied / interviewing / etc.)
 - (Later, separate design discussion: Gmail read-only ingestion to detect
-  confirmations/rejections. Do not build yet.)
+  confirmations/rejections — and to ingest LinkedIn job-alert emails as a
+  discovery source. Do not build yet.)
 
 **Phase 4+ (deferred, schema-only for now):** HR contact finder, outreach
 drafting, approval queue/outbox, alumni triage.
