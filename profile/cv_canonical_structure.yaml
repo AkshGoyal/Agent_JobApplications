@@ -1,0 +1,85 @@
+# cv_canonical_structure.yaml — the ONLY source of truth for which entries
+# and bullets currently exist on the canonical CV (profile/cv_canonical.pdf).
+#
+# `tailor` may ONLY suggest revised wording for the bullets listed here. It
+# must never add a section, entry, or bullet not already present — even if
+# true and present in facts.yaml (facts.yaml has more history than the CV
+# shows; this file is deliberately the narrower, exact-CV-match source).
+# `id` values are stable identifiers referenced by the tailor pipeline to
+# constrain the LLM's structured output (Literal[...] enum) so an invented
+# entry is schema-invalid, not just discouraged.
+#
+# Update this file whenever cv_canonical.pdf changes, keeping bullets
+# verbatim (including the **bold** keyword markup already used in the PDF).
+
+sections:
+  "Education":
+    - id: iit_delhi
+      entry: "Indian Institute of Technology Delhi | New Delhi, India"
+      context: null
+      bullets:
+        - "B.Tech in Textile Engineering | 2021-2025"
+        - "Minor Degree, Business Management | CGPA: 8.8 | 2021-2025"
+
+  "Professional Experience":
+    - id: aspect_ratio_analyst
+      entry: "Aspect Ratio | Analyst | Jun 2025 – Present"
+      context: "Chatbot for marketing research for a US pharmaceutical company"
+      bullets:
+        - "Architected production **RAG system** using **OpenAI APIs, hybrid retrieval** combining **semantic vector search** with keyword-based **BM25** and **routing agents**."
+        - "Conducted state-of-the-art RAG research; evaluated **chunking, embeddings, search** strategies."
+        - "Built evaluation framework and structured PDF extraction and achieved **94% accuracy**."
+    - id: grant_thornton_summer_trainee
+      entry: "Grant Thornton | Summer Trainee: Public Sector Consulting | May 2024 - July 2024"
+      context: "Large-scale human resource deployment project for a major govt department"
+      bullets:
+        - "Developed a **Power BI** dashboard to track resource deployment status and project metrics state-wise and designation-wise"
+        - "Performed Data Analysis on monthly performance reports collected to make trends on leaves taken and calculate penalty"
+        - "Compilation of **2000+** compliance documents for **287** deployed resources for submission to the client as per project"
+
+  "Projects":
+    - id: geo_optimization
+      entry: "GEO Optimization | July 2025"
+      context: null
+      bullets:
+        - "Built GEO optimization engine transforming webpages into **LLM-retrieval** optimized content"
+        - "Evaluated **150+** synthetic LLM queries; Improved **AI citation** by 41%"
+    - id: ecommerce_sales_insights
+      entry: "E-commerce Sales Insights Analysis | Jan 2025"
+      context: null
+      bullets:
+        - "Constructed an advanced Power BI dashboard evaluating critical e-commerce metrics to actively drive strategic business decisions."
+        - "Applied data manipulation techniques via Power Query and DAX to systematically optimize raw data for high-impact visualizations."
+    - id: market_entry_luxury_apparel
+      entry: "Market Entry of a New Luxury Apparel Brand | Prof. Biswajita Parida | Feb 2024 – June 2024"
+      context: null
+      bullets:
+        - "Conducted **primary and secondary research** including consumer and store manager interviews and industry analysis"
+        - "Developed a detailed **Go-to-Market Strategy**, including a Marketing Plan and Marketing Mix to establish our brand"
+
+  "Leadership & Organizational Roles":
+    - id: tryst_coordinator
+      entry: "Coordinator, Tryst, CAIC, IIT Delhi | Jan 2024 - April 2024"
+      context: "Led a 3-tier team of 30 executives for orchestration of the events"
+      bullets:
+        - "Strategized and executed the guest lecture series for Tryst 2024, ensuring high-profile speakers and event management"
+        - "Coordinated with all stakeholders, including industry experts and faculty, to align event content with current industry trends"
+    - id: share_senior_member
+      entry: "Senior Member, ShARE, SAC, IIT Delhi | June 2022 - May 2023"
+      context: "One of 8 candidates selected among 100+ applicants"
+      bullets:
+        - "Created event flow & questionnaire for the Private Equity Panel talk and moderated the panel of 4 Senior Professionals"
+
+  "Extracurriculars & Accolades":
+    - id: scholastic
+      entry: "Scholastic"
+      context: null
+      bullets:
+        - "Ranked top 0.07% (Rank 794) out of 10 Lakh+ candidates in JEE Mains 2021."
+        - "Cleared NTSE Stage-1 (top 0.002%) and Pre RMO; Secured Gold Medal in SOF Int. Maths Olympiad (Intl. Rank 1327)."
+    - id: technical_skills
+      entry: "Technical Skills"
+      context: null
+      bullets:
+        - "**AI:** LangChain, OpenAI API, RAG, Agentic Workflows, Prompt Engineering, Fine-tuning"
+        - "**Search:** Hybrid Retrieval, BM25, Semantic Search, Chunking, Embedding Models"
