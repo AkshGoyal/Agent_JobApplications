@@ -5,7 +5,9 @@ Every LLM call in this project goes through :func:`call`:
 - output is validated against a Pydantic model via Gemini structured output
   (``response_schema`` + ``response_mime_type="application/json"``)
 - model name / max_tokens come from config.py only
-- retries are handled by the google-genai SDK's built-in retry logic
+- retries on transient errors (429/5xx, timeouts) are configured explicitly
+  via HttpRetryOptions — google-genai makes a single attempt by default,
+  unlike the Anthropic SDK, so this must be set or a 503 fails immediately
 - token usage is logged for inspectability
 
 Swapping the LLM provider is contained to this file plus config.py — the
@@ -39,10 +41,22 @@ class LLMError(RuntimeError):
 
 
 def get_client() -> genai.Client:
-    """Lazily create the shared client (reads GEMINI_API_KEY from env)."""
+    """Lazily create the shared client (reads GEMINI_API_KEY from env).
+
+    Without explicit retry_options, google-genai makes exactly one attempt
+    and raises immediately — no retry on 429/5xx like the Anthropic SDK gives
+    for free. HttpRetryOptions() with no args uses the library's own sane
+    defaults (5 attempts, ~1-60s exponential backoff with jitter, retrying
+    408/429/500/502/503/504 and connect/timeout errors) — exactly the
+    transient-overload case ("model is currently experiencing high demand").
+    """
     global _client
     if _client is None:
-        _client = genai.Client()
+        _client = genai.Client(
+            http_options=types.HttpOptions(
+                retry_options=types.HttpRetryOptions(),
+            )
+        )
     return _client
 
 
