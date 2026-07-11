@@ -135,6 +135,35 @@ def status_counts(conn: sqlite3.Connection) -> dict[str, int]:
     return {row["status"]: row["n"] for row in rows}
 
 
+# --- generated_asset ---------------------------------------------------------
+
+def insert_generated_asset(
+    conn: sqlite3.Connection,
+    job_id: int,
+    kind: str,
+    prompt_context_hash: str,
+    content: str,
+) -> int:
+    """Log a generated CV/cover-letter/answer draft. `kind` must match the
+    table's CHECK constraint: 'cv_bullets', 'cover_letter', 'form_answer'."""
+    cur = conn.execute(
+        """INSERT INTO generated_asset (job_id, kind, prompt_context_hash, content)
+           VALUES (?, ?, ?, ?)""",
+        (job_id, kind, prompt_context_hash, content),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def list_generated_assets(conn: sqlite3.Connection, job_id: int) -> list[sqlite3.Row]:
+    """All generated assets for a job, newest first."""
+    return conn.execute(
+        """SELECT * FROM generated_asset WHERE job_id = ?
+           ORDER BY created_at DESC, id DESC""",
+        (job_id,),
+    ).fetchall()
+
+
 def set_ranking(
     conn: sqlite3.Connection, job_id: int, score: int, rationale: str
 ) -> None:
