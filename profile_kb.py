@@ -43,6 +43,95 @@ def career_arc() -> str:
     return "\n".join(collected).strip()
 
 
+def load_cv_structure() -> dict:
+    """The canonical CV's exact sections/entries/bullets (section name ->
+    list of {id, entry, context, bullets}). This is the ONLY source `tailor`
+    may draw entries from — facts.yaml has more history than the CV shows
+    (old-CV-only roles, supplementary detail); this file is deliberately the
+    narrower, exact-CV-match source of truth.
+    """
+    with open(config.PROFILE_DIR / "cv_canonical_structure.yaml") as f:
+        return yaml.safe_load(f)["sections"]
+
+
+def cv_section_names() -> tuple[str, ...]:
+    """The 5 canonical section names, in CV order."""
+    return tuple(load_cv_structure().keys())
+
+
+def cv_entry_ids() -> tuple[str, ...]:
+    """Every entry id across all sections — used to constrain the tailor
+    LLM's structured output to real entries via a Literal[...] type."""
+    return tuple(
+        entry["id"]
+        for entries in load_cv_structure().values()
+        for entry in entries
+    )
+
+
+def render_cv_structure_for_prompt() -> str:
+    """Readable section -> entry -> bullets block for the tailor_cv prompt."""
+    lines = []
+    for section, entries in load_cv_structure().items():
+        lines.append(f"## {section}")
+        for entry in entries:
+            lines.append(f"### [{entry['id']}] {entry['entry']}")
+            if entry.get("context"):
+                lines.append(f"_{entry['context']}_")
+            for bullet in entry["bullets"]:
+                lines.append(f"− {bullet}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def tailoring_context() -> str:
+    """Profile context for tailor_cv / tailor_cover_letter.
+
+    Broader than ranking_context(): adds the full narratives text (role
+    detail, framing) so wording can be specific — but still excludes
+    identity/contact (unchanged reasoning: never let the LLM fabricate or
+    reproduce personal fields; those are injected deterministically by code
+    where needed, e.g. the cover letter's signature block).
+    """
+    facts = load_facts()
+    section_keys = ("education", "experience", "projects", "leadership",
+                    "achievements", "skills", "targets")
+    sections = {k: facts[k] for k in section_keys if k in facts}
+    parts = [
+        "Profile facts (YAML):\n"
+        + yaml.dump(sections, sort_keys=False, allow_unicode=True),
+        "Narratives (context for framing/wording only — every claim must "
+        "still be grounded in the facts above; do not introduce new "
+        "unverifiable claims):\n" + load_narratives(),
+    ]
+    return "\n\n".join(parts)
+
+
+def canned_context() -> str:
+    """Renders canned_answers.yaml for the `answer` prompt. Blank fields are
+    marked explicitly so the prompt itself reinforces the policy: flag
+    instead of guessing.
+    """
+    data = load_canned_answers()
+
+    def render_section(section: dict) -> str:
+        lines = []
+        for key, value in section.items():
+            if value in (None, "", []):
+                lines.append(f"{key}: (not provided — flag as needs_input, never guess)")
+            else:
+                lines.append(f"{key}: {value}")
+        return "\n".join(lines)
+
+    parts = [
+        "Logistics:\n" + render_section(data.get("logistics", {})),
+        "Standard questions:\n" + render_section(data.get("standard_questions", {})),
+        "Policies (must always follow):\n"
+        + "\n".join(f"- {p}" for p in data.get("policies", [])),
+    ]
+    return "\n\n".join(parts)
+
+
 def ranking_context() -> str:
     """Compact profile context for the ranking prompt.
 

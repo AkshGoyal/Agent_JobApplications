@@ -1,9 +1,13 @@
-"""Job search assistant CLI (Phase 1).
+"""Job search assistant CLI.
 
     python -m cli.main ingest paste --url <URL> [--file jd.txt] [--rank]
     python -m cli.main rank [JOB_ID]
     python -m cli.main list [--min-score 70] [--status discovered]
     python -m cli.main show <JOB_ID>
+    python -m cli.main status <JOB_ID> <NEW_STATUS>
+    python -m cli.main status-report
+    python -m cli.main tailor <JOB_ID>
+    python -m cli.main answer <JOB_ID> "question text"
 """
 
 import sys
@@ -15,8 +19,10 @@ import typer
 import config
 import llm
 from db import database, repo
+from pipeline import answer as answer_pipeline
 from pipeline import ingest as ingest_pipeline
 from pipeline import rank as rank_pipeline
+from pipeline import tailor as tailor_pipeline
 
 app = typer.Typer(no_args_is_help=True, help="Personal job search assistant (Phase 1).")
 ingest_app = typer.Typer(help="Capture jobs into the database.")
@@ -154,6 +160,82 @@ def list_jobs(
                 row["status"],
             )
         )
+
+
+@app.command()
+def status(
+    job_id: int = typer.Argument(..., help="Job id (see `list`)."),
+    new_status: str = typer.Argument(
+        ..., help="One of: " + ", ".join(repo.STATUS_LIFECYCLE)
+    ),
+):
+    """Record a status transition (e.g. `status 3 applied`). Always manual."""
+    conn = _connect()
+    try:
+        repo.set_status(conn, job_id, new_status)
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1)
+    job = repo.get_job(conn, job_id)
+    typer.echo(
+        f"Job {job_id} ({job['company_name']} — {job['title']}) → {new_status}"
+    )
+
+
+@app.command("status-report")
+def status_report():
+    """Show the funnel: how many jobs sit in each lifecycle stage."""
+    counts = repo.status_counts(_connect())
+    total = sum(counts.values())
+    if total == 0:
+        typer.echo("No jobs stored yet.")
+        return
+    for stage in repo.STATUS_LIFECYCLE:
+        n = counts.get(stage, 0)
+        bar = "#" * n
+        typer.echo(f"{stage:<16} {n:>4}  {bar}")
+    typer.echo(f"{'total':<16} {total:>4}")
+
+
+@app.command()
+def tailor(job_id: int = typer.Argument(..., help="Job id (see `list`).")):
+    """Generate CV bullet suggestions + a cover letter draft for a job."""
+    _require_api_key()
+    conn = _connect()
+    try:
+        result = tailor_pipeline.tailor_job(conn, job_id)
+    except (ValueError, llm.LLMError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Job {result.job_id} — materials generated (status: materials_ready)")
+    typer.echo(f"  CV bullets:    {result.cv_path}")
+    typer.echo(f"  Cover letter:  {result.cover_letter_path}")
+    if result.warnings:
+        typer.echo("")
+        typer.echo("Warnings (review before using):")
+        for w in result.warnings:
+            typer.echo(f"  - {w}")
+
+
+@app.command()
+def answer(
+    job_id: int = typer.Argument(..., help="Job id (see `list`)."),
+    question: str = typer.Argument(..., help="The application question to answer."),
+):
+    """Answer an application question, preferring canned answers over generation."""
+    _require_api_key()
+    conn = _connect()
+    try:
+        record = answer_pipeline.answer_question(conn, job_id, question)
+    except (ValueError, llm.LLMError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1)
+
+    if record.source == "needs_input":
+        typer.echo(f"needs your input: {record.note}")
+    else:
+        typer.echo(f"[{record.source}] {record.answer}")
 
 
 @app.command()

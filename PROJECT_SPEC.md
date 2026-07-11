@@ -17,7 +17,9 @@ leave room for them without building them now.
 - No automated submission of applications, anywhere.
 - No LinkedIn automation of any kind (no scraping, no messaging, no login).
 - No email sending. (A future phase adds a human-approved outbox; not now.)
-- No web UI in early phases. CLI first.
+- ~~No web UI in early phases. CLI first.~~ *(Lifted 2026-07-11 by owner
+  decision: a local, single-user web UI now wraps the same pipeline functions
+  as the CLI — see `web/`. Still no hosted/multi-user deployment.)*
 - No multi-agent framework (CrewAI, LangGraph, AutoGen, etc.). This is a
   deterministic pipeline with LLM calls at specific steps, not an agent swarm.
 
@@ -58,6 +60,7 @@ generation/       # tailor CV bullets, cover letter, form-question answers (LLM)
 profile/          # my knowledge base (YAML facts + Markdown narratives)
 db/               # schema, migrations, repository functions
 cli/              # commands: ingest, rank, list, show, tailor, answer, status
+web/              # local single-user web UI (FastAPI + one static page) over the same pipeline
 config.py         # API keys via env vars, model settings, paths
 ```
 
@@ -108,23 +111,32 @@ about me.
 5. CLI: `ingest paste`, `rank`, `list --min-score 70`, `show <job_id>`
 6. Tests for parsing, dedup, and the extraction/ranking prompts' I/O contracts
 
-**Phase 2 — generation:**
+**Phase 2 — generation:** *(delivered 2026-07-11)*
 - `tailor <job_id>` → CV bullet suggestions + cover letter draft as Markdown
   files under `output/<company>-<job_id>/`
-  - CV output must match the style of `profile/cv_canonical.pdf`: the same
-    five sections (Education / Professional Experience / Projects /
-    Leadership & Organizational Roles / Extracurriculars & Accolades) and the
-    same bullet style (em-dash bullets, concise, key terms bolded,
-    metric-led). It suggests better bullets for existing entries; it never
-    invents new sections, and every bullet must be traceable to `profile/`.
-- `answer <job_id> "question text"` → drafted form answer grounded in profile
+  - CV output matches the style of `profile/cv_canonical.pdf`: the same five
+    sections (Education / Professional Experience / Projects / Leadership &
+    Organizational Roles / Extracurriculars & Accolades) and the same bullet
+    style (em-dash bullets, concise, key terms bolded, metric-led). It
+    suggests better bullets for existing entries; it never invents new
+    sections, and every bullet must be traceable to `profile/`. Enforced at
+    the schema level: `entry_id`/`section` are constrained to `Literal[...]`
+    values built from `profile/cv_canonical_structure.yaml` (the ground-truth
+    transcription of the canonical CV), so an invented entry is
+    schema-invalid, not merely discouraged by the prompt.
+- `answer <job_id> "question text"` → drafted form answer grounded in
+  profile; prefers `profile/canned_answers.yaml` over generation, with a
+  code-level defense-in-depth check that re-verifies a claimed canned field
+  isn't actually blank before trusting it.
 - Log all generated assets to `generated_asset`
 
-**Phase 3 — tracking:**
-- Manual status transitions via CLI; `status-report` command showing the
-  funnel (discovered / applied / interviewing / etc.)
+**Phase 3 — tracking:** *(delivered 2026-07-11, alongside the web UI)*
+- Manual status transitions via CLI (`status <job_id> <stage>`) and web UI;
+  `status-report` command / funnel strip showing the funnel
+  (discovered / applied / interviewing / etc.)
 - (Later, separate design discussion: Gmail read-only ingestion to detect
-  confirmations/rejections. Do not build yet.)
+  confirmations/rejections — and to ingest LinkedIn job-alert emails as a
+  discovery source. Do not build yet.)
 
 **Phase 4+ (deferred, schema-only for now):** HR contact finder, outreach
 drafting, approval queue/outbox, alumni triage.

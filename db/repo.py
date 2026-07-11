@@ -2,6 +2,21 @@
 
 import sqlite3
 
+# The job status lifecycle, in funnel order. Mirrors the CHECK constraint in
+# db/migrations/0001_initial.sql — keep the two in sync.
+STATUS_LIFECYCLE = (
+    "discovered",
+    "ranked",
+    "shortlisted",
+    "materials_ready",
+    "applied",
+    "in_process",
+    "interview",
+    "offer",
+    "rejected",
+    "dropped",
+)
+
 
 # --- company ----------------------------------------------------------------
 
@@ -90,6 +105,62 @@ def jobs_with_status(conn: sqlite3.Connection, status: str) -> list[sqlite3.Row]
            FROM job JOIN company ON company.id = job.company_id
            WHERE job.status = ? ORDER BY job.id""",
         (status,),
+    ).fetchall()
+
+
+def set_status(conn: sqlite3.Connection, job_id: int, status: str) -> None:
+    """Record a human-driven status transition (e.g. applied, interview).
+
+    Transitions to 'applied' and beyond are always made by the user — never
+    automatically (see PROJECT_SPEC.md).
+    """
+    if status not in STATUS_LIFECYCLE:
+        raise ValueError(
+            f"unknown status '{status}' — must be one of: "
+            + ", ".join(STATUS_LIFECYCLE)
+        )
+    cur = conn.execute(
+        """UPDATE job SET status = ?, status_updated_at = datetime('now')
+           WHERE id = ?""",
+        (status, job_id),
+    )
+    if cur.rowcount == 0:
+        raise ValueError(f"no job with id {job_id}")
+    conn.commit()
+
+
+def status_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    """Jobs per status, for the funnel report. Only non-empty statuses appear."""
+    rows = conn.execute("SELECT status, COUNT(*) AS n FROM job GROUP BY status")
+    return {row["status"]: row["n"] for row in rows}
+
+
+# --- generated_asset ---------------------------------------------------------
+
+def insert_generated_asset(
+    conn: sqlite3.Connection,
+    job_id: int,
+    kind: str,
+    prompt_context_hash: str,
+    content: str,
+) -> int:
+    """Log a generated CV/cover-letter/answer draft. `kind` must match the
+    table's CHECK constraint: 'cv_bullets', 'cover_letter', 'form_answer'."""
+    cur = conn.execute(
+        """INSERT INTO generated_asset (job_id, kind, prompt_context_hash, content)
+           VALUES (?, ?, ?, ?)""",
+        (job_id, kind, prompt_context_hash, content),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def list_generated_assets(conn: sqlite3.Connection, job_id: int) -> list[sqlite3.Row]:
+    """All generated assets for a job, newest first."""
+    return conn.execute(
+        """SELECT * FROM generated_asset WHERE job_id = ?
+           ORDER BY created_at DESC, id DESC""",
+        (job_id,),
     ).fetchall()
 
 
