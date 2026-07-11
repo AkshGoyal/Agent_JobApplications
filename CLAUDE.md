@@ -23,7 +23,7 @@ before making design decisions).
 1. **Deterministic pipeline, LLM at the joints.** Code handles parsing,
    dedup, storage, state transitions. The LLM is called only where judgment
    is needed: field extraction from pasted JDs, relevance scoring, and
-   (Phase 2) tailoring/drafting.
+   tailoring/drafting (CV bullets, cover letters, application answers).
 2. **Human approves everything outbound.** All outputs are drafts I read and
    use manually.
 3. **Everything is inspectable.** SQLite, YAML/Markdown, plain CLI.
@@ -42,10 +42,11 @@ prompts/          # readable prompt template files (never scattered f-strings)
 db/               # migrations, connection, repository functions
 sources/          # one module per job source (Phase 1: manual_paste)
 pipeline/         # normalize → dedup → ingest → rank
-cli/              # Typer app: ingest paste, rank, list, show, status, status-report
+cli/              # Typer app: ingest paste, rank, list, show, status, status-report, tailor, answer
 web/              # FastAPI app + single static page — same pipeline, in the browser
-profile/          # my knowledge base: facts.yaml, narratives.md, canned_answers.yaml, cv_canonical.pdf
-output/           # generated materials (gitignored; Phase 2)
+profile/          # my knowledge base: facts.yaml, narratives.md, canned_answers.yaml, cv_canonical.pdf,
+                  #   cv_canonical_structure.yaml (ground-truth CV entries for tailor)
+output/           # generated materials (gitignored)
 tests/            # pytest; LLM client is always mocked — no live API calls in tests
 ```
 
@@ -54,7 +55,7 @@ Job status lifecycle:
 Transitions to `applied` and beyond are made by me via the CLI, never
 automatically.
 
-## Phase 1 CLI (current scope)
+## CLI (current scope)
 
 ```bash
 python -m cli.main ingest paste --url <URL> [--file jd.txt] [--rank]
@@ -63,6 +64,8 @@ python -m cli.main list [--min-score 70] [--status discovered]
 python -m cli.main show <JOB_ID>
 python -m cli.main status <JOB_ID> <STAGE>   # e.g. status 3 applied — always manual
 python -m cli.main status-report             # funnel counts per lifecycle stage
+python -m cli.main tailor <JOB_ID>           # CV bullet suggestions + cover letter draft
+python -m cli.main answer <JOB_ID> "question text"
 ```
 
 ## Web UI
@@ -81,22 +84,30 @@ always **stores first, ranks after** — a failed LLM call must never lose a
 pasted JD. Duplicates (same company+title+location hash or same source URL)
 are reported, not re-inserted.
 
-## Phase 2 contract (recorded now, do not build yet)
+## Phase 2 generation: `tailor` + `answer`
 
-`tailor <job_id>` must output CV content matching the style of
-`profile/cv_canonical.pdf`:
+`tailor <job_id>` outputs CV bullet suggestions and a cover letter draft to
+`output/<company>-<job_id>/` and logs both as `generated_asset` rows; the job
+advances to `materials_ready`. Grounding is enforced at the schema level, not
+just prompt wording: `profile/cv_canonical_structure.yaml` is the sole
+ground-truth source of CV entries (hand-transcribed from `cv_canonical.pdf`),
+and the LLM's response schema constrains `entry_id`/`section` to
+`Literal[...]` values built from that file — inventing an entry or a section
+outside the canonical five (Education / Professional Experience / Projects /
+Leadership & Organizational Roles / Extracurriculars & Accolades) is
+schema-invalid, not merely discouraged. It suggests improved bullets for
+existing entries only; a soft drift check flags (never blocks) suggestions
+whose `original_bullet` doesn't closely match a known bullet. The cover
+letter's signature is appended deterministically by code, never LLM-written.
 
-- The same five sections only: Education / Professional Experience /
-  Projects / Leadership & Organizational Roles / Extracurriculars & Accolades.
-- The same bullet style: em-dash bullets, concise (1–2 lines), key terms
-  bolded, metric-led where possible.
-- It suggests improved bullets for existing entries; it **never invents new
-  sections** and every bullet must trace to `profile/` facts.
-
-`answer <job_id> "question"` must prefer `profile/canned_answers.yaml`
-verbatim/adapted over fresh generation, and must follow the `policies` list
-in that file (never misstate CGPA, never claim absent skills, flag instead of
-guessing when a canned answer is blank).
+`answer <job_id> "question"` prefers `profile/canned_answers.yaml`
+verbatim/adapted over fresh generation, and follows the `policies` list in
+that file (never misstate CGPA, never claim absent skills, flag instead of
+guessing when a canned answer is blank). Defense in depth: even if the model
+claims a canned field applies, code independently re-verifies the field
+isn't blank before trusting it — never trusts the model's self-report.
+Always logged to `generated_asset`, including `needs_input` results, for an
+audit trail.
 
 ## Working agreements
 

@@ -111,20 +111,26 @@ about me.
 5. CLI: `ingest paste`, `rank`, `list --min-score 70`, `show <job_id>`
 6. Tests for parsing, dedup, and the extraction/ranking prompts' I/O contracts
 
-**Phase 2 — generation:**
+**Phase 2 — generation:** *(delivered 2026-07-11)*
 - `tailor <job_id>` → CV bullet suggestions + cover letter draft as Markdown
   files under `output/<company>-<job_id>/`
-  - CV output must match the style of `profile/cv_canonical.pdf`: the same
-    five sections (Education / Professional Experience / Projects /
-    Leadership & Organizational Roles / Extracurriculars & Accolades) and the
-    same bullet style (em-dash bullets, concise, key terms bolded,
-    metric-led). It suggests better bullets for existing entries; it never
-    invents new sections, and every bullet must be traceable to `profile/`.
-- `answer <job_id> "question text"` → drafted form answer grounded in profile
+  - CV output matches the style of `profile/cv_canonical.pdf`: the same five
+    sections (Education / Professional Experience / Projects / Leadership &
+    Organizational Roles / Extracurriculars & Accolades) and the same bullet
+    style (em-dash bullets, concise, key terms bolded, metric-led). It
+    suggests better bullets for existing entries; it never invents new
+    sections, and every bullet must be traceable to `profile/`. Enforced at
+    the schema level: `entry_id`/`section` are constrained to `Literal[...]`
+    values built from `profile/cv_canonical_structure.yaml` (the ground-truth
+    transcription of the canonical CV), so an invented entry is
+    schema-invalid, not merely discouraged by the prompt.
+- `answer <job_id> "question text"` → drafted form answer grounded in
+  profile; prefers `profile/canned_answers.yaml` over generation, with a
+  code-level defense-in-depth check that re-verifies a claimed canned field
+  isn't actually blank before trusting it.
 - Log all generated assets to `generated_asset`
 
-**Phase 3 — tracking:** *(delivered 2026-07-11, ahead of Phase 2, alongside
-the web UI)*
+**Phase 3 — tracking:** *(delivered 2026-07-11, alongside the web UI)*
 - Manual status transitions via CLI (`status <job_id> <stage>`) and web UI;
   `status-report` command / funnel strip showing the funnel
   (discovered / applied / interviewing / etc.)
