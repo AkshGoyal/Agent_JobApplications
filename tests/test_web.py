@@ -5,9 +5,11 @@ from fastapi.testclient import TestClient
 
 import config
 import llm
+from pipeline.answer import AnswerResult
 from pipeline.rank import RankingResult
 from sources.manual_paste import ExtractedJobFields
 from tests.conftest import FakeLLMClient, make_response
+from tests.tailor_test_helpers import valid_cover_letter_result, valid_cv_result
 from web.app import app
 
 FIELDS = ExtractedJobFields(
@@ -114,3 +116,45 @@ def test_rank_endpoint(client, monkeypatch):
     assert res.status_code == 200
     assert res.json()["relevance_score"] == 88
     assert client.post("/api/jobs/999/rank").status_code == 404
+
+
+def test_tailor_endpoint(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path / "output")
+    job_id = _add_job(client, monkeypatch, rank=False).json()["job_id"]
+    _mock_llm(monkeypatch, make_response(valid_cv_result()), make_response(valid_cover_letter_result()))
+
+    res = client.post(f"/api/jobs/{job_id}/tailor")
+    assert res.status_code == 200
+    body = res.json()
+    assert "Aspect Ratio" in body["cv_markdown"]
+    assert body["warnings"] == []
+    assert body["job"]["status"] == "materials_ready"
+
+    assert client.post("/api/jobs/999/tailor").status_code == 404
+
+
+def test_answer_endpoint(client, monkeypatch):
+    job_id = _add_job(client, monkeypatch, rank=False).json()["job_id"]
+    _mock_llm(monkeypatch, make_response(AnswerResult(source="generated", answer="I built a RAG system.")))
+
+    res = client.post(f"/api/jobs/{job_id}/answer", json={"question": "Tell us about a project."})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["source"] == "generated"
+    assert "RAG" in body["answer"]
+
+    assert client.post("/api/jobs/999/answer", json={"question": "Q?"}).status_code == 404
+
+
+def test_assets_endpoint_lists_generated_materials(client, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path / "output")
+    job_id = _add_job(client, monkeypatch, rank=False).json()["job_id"]
+
+    assert client.get(f"/api/jobs/{job_id}/assets").json() == []
+
+    _mock_llm(monkeypatch, make_response(valid_cv_result()), make_response(valid_cover_letter_result()))
+    client.post(f"/api/jobs/{job_id}/tailor")
+
+    assets = client.get(f"/api/jobs/{job_id}/assets").json()
+    assert {a["kind"] for a in assets} == {"cv_bullets", "cover_letter"}
+    assert client.get("/api/jobs/999/assets").status_code == 404

@@ -120,6 +120,24 @@
     <button id="rank-btn" class="secondary">Rank now</button>
   </div>
   <div id="detail-msg" style="min-height:1.4em;margin-top:.4rem;font-size:.9rem"></div>
+
+  <h2 style="margin-top:1rem">Materials</h2>
+  <button id="tailor-btn" class="secondary">Generate CV bullets + cover letter</button>
+  <div id="tailor-msg" style="min-height:1.4em;margin-top:.4rem;font-size:.9rem"></div>
+  <div id="tailor-warnings" class="warn" style="font-size:.85rem"></div>
+  <div id="materials" hidden>
+    <h2 style="margin-top:1rem">CV bullet suggestions</h2>
+    <pre id="cv-markdown"></pre>
+    <h2>Cover letter draft</h2>
+    <pre id="cover-letter-markdown"></pre>
+  </div>
+
+  <h2 style="margin-top:1rem">Ask a question</h2>
+  <label for="question">Application question</label>
+  <input type="text" id="question" placeholder="e.g. What is your notice period?">
+  <button id="answer-btn" class="secondary">Ask</button>
+  <div id="answer-msg" style="min-height:1.4em;margin-top:.4rem;font-size:.9rem"></div>
+
   <h2 style="margin-top:1rem">Description (verbatim)</h2>
   <pre id="detail-desc"></pre>
 </section>
@@ -214,9 +232,27 @@ async function openDetail(id) {
   $("status-set").value = j.status;
   $("detail-desc").textContent = j.description_text;
   setMsg($("detail-msg"), "");
+  setMsg($("tailor-msg"), "");
+  $("tailor-warnings").textContent = "";
+  setMsg($("answer-msg"), "");
+  $("question").value = "";
   document.querySelectorAll("#jobs-body tr").forEach(tr =>
     tr.classList.toggle("selected", Number(tr.dataset.id) === id));
+  await loadLatestAssets(id);
   $("detail").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function loadLatestAssets(id) {
+  const assets = await api(`/api/jobs/${id}/assets`);
+  const cv = assets.find(a => a.kind === "cv_bullets");
+  const letter = assets.find(a => a.kind === "cover_letter");
+  if (cv || letter) {
+    $("materials").hidden = false;
+    $("cv-markdown").textContent = cv ? cv.content : "(none generated yet)";
+    $("cover-letter-markdown").textContent = letter ? letter.content : "(none generated yet)";
+  } else {
+    $("materials").hidden = true;
+  }
 }
 
 async function refreshAll() { await loadReport(); await loadJobs(); }
@@ -275,6 +311,53 @@ $("rank-btn").addEventListener("click", async () => {
     await refreshAll(); await openDetail(selectedId);
   } catch (e) { setMsg($("detail-msg"), "Error: " + e.message, "err"); }
   finally { btn.disabled = false; }
+});
+
+$("tailor-btn").addEventListener("click", async () => {
+  if (selectedId == null) return;
+  const btn = $("tailor-btn");
+  btn.disabled = true;
+  $("tailor-warnings").textContent = "";
+  setMsg($("tailor-msg"), "Generating CV bullets + cover letter…");
+  try {
+    const r = await api(`/api/jobs/${selectedId}/tailor`, { method: "POST" });
+    $("materials").hidden = false;
+    $("cv-markdown").textContent = r.cv_markdown;
+    $("cover-letter-markdown").textContent = r.cover_letter_markdown;
+    setMsg($("tailor-msg"), "Generated — review before using.", "ok");
+    if (r.warnings.length) {
+      $("tailor-warnings").textContent =
+        "Warnings: " + r.warnings.join(" | ");
+    }
+    await refreshAll();
+    document.querySelectorAll("#jobs-body tr").forEach(tr =>
+      tr.classList.toggle("selected", Number(tr.dataset.id) === selectedId));
+  } catch (e) {
+    setMsg($("tailor-msg"), "Error: " + e.message, "err");
+  } finally { btn.disabled = false; }
+});
+
+$("answer-btn").addEventListener("click", async () => {
+  if (selectedId == null) return;
+  const question = $("question").value.trim();
+  if (!question) return;
+  const btn = $("answer-btn");
+  btn.disabled = true;
+  setMsg($("answer-msg"), "Thinking…");
+  try {
+    const r = await api(`/api/jobs/${selectedId}/answer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (r.source === "needs_input") {
+      setMsg($("answer-msg"), "Needs your input: " + r.note, "warn");
+    } else {
+      setMsg($("answer-msg"), `[${r.source}] ${r.answer}`, "ok");
+    }
+  } catch (e) {
+    setMsg($("answer-msg"), "Error: " + e.message, "err");
+  } finally { btn.disabled = false; }
 });
 
 $("refresh-btn").addEventListener("click", refreshAll);

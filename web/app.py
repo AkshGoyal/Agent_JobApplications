@@ -20,8 +20,10 @@ from pydantic import BaseModel
 import config
 import llm
 from db import database, repo
+from pipeline import answer as answer_pipeline
 from pipeline import ingest as ingest_pipeline
 from pipeline import rank as rank_pipeline
+from pipeline import tailor as tailor_pipeline
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -36,6 +38,10 @@ class IngestRequest(BaseModel):
 
 class StatusRequest(BaseModel):
     status: str
+
+
+class AnswerRequest(BaseModel):
+    question: str
 
 
 def _require_api_key() -> None:
@@ -130,6 +136,52 @@ def api_report():
         "counts": counts,
         "total": sum(counts.values()),
     }
+
+
+@app.post("/api/jobs/{job_id}/tailor")
+def api_tailor_job(job_id: int):
+    _require_api_key()
+    with closing(database.connect()) as conn:
+        try:
+            result = tailor_pipeline.tailor_job(conn, job_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except llm.LLMError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        return {
+            "cv_markdown": result.cv_path.read_text(),
+            "cover_letter_markdown": result.cover_letter_path.read_text(),
+            "warnings": result.warnings,
+            "cv_path": str(result.cv_path),
+            "cover_letter_path": str(result.cover_letter_path),
+            "job": dict(repo.get_job(conn, job_id)),
+        }
+
+
+@app.post("/api/jobs/{job_id}/answer")
+def api_answer_question(job_id: int, req: AnswerRequest):
+    _require_api_key()
+    with closing(database.connect()) as conn:
+        try:
+            record = answer_pipeline.answer_question(conn, job_id, req.question)
+        except ValueError as exc:
+            code = 404 if "no job" in str(exc) else 400
+            raise HTTPException(status_code=code, detail=str(exc))
+        except llm.LLMError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        return {
+            "source": record.source,
+            "answer": record.answer,
+            "note": record.note,
+        }
+
+
+@app.get("/api/jobs/{job_id}/assets")
+def api_list_assets(job_id: int):
+    with closing(database.connect()) as conn:
+        if repo.get_job(conn, job_id) is None:
+            raise HTTPException(status_code=404, detail=f"no job with id {job_id}")
+        return [dict(row) for row in repo.list_generated_assets(conn, job_id)]
 
 
 def main() -> None:
