@@ -2,6 +2,7 @@
   "name": "Job Search Assistant",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
   "postCreateCommand": "bash scripts/install_pkgs.sh",
+  "forwardPorts": [8000],
   "customizations": {
     "vscode": {
       "extensions": ["ms-python.python"]

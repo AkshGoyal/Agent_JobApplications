@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Job Search Assistant</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #666;
+    --line: #ddd; --panel: #f6f6f4; --accent: #0b57d0;
+    --ok: #1a7f37; --warn: #9a6700; --err: #c62828;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101214; --fg: #e6e6e6; --muted: #9a9a9a;
+      --line: #33383d; --panel: #191c1f; --accent: #7aa9ff;
+      --ok: #4caf50; --warn: #e0a800; --err: #ef5350;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto; padding: 1.5rem 1rem 4rem; max-width: 72rem;
+    background: var(--bg); color: var(--fg);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1rem; margin: 0 0 .75rem; }
+  #funnel { color: var(--muted); margin-bottom: 1.25rem; min-height: 1.5em; }
+  section {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;
+  }
+  label { display: block; font-size: .85rem; color: var(--muted); margin: .5rem 0 .15rem; }
+  input[type=text], input[type=number], textarea, select {
+    width: 100%; padding: .45rem .6rem; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit;
+  }
+  textarea { min-height: 9rem; resize: vertical; }
+  .row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: end; }
+  .row > div { flex: 1; min-width: 10rem; }
+  .row > div.narrow { flex: 0 0 9rem; min-width: 9rem; }
+  button {
+    padding: .5rem 1rem; border: none; border-radius: 6px; cursor: pointer;
+    background: var(--accent); color: #fff; font: inherit; margin-top: .75rem;
+  }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  button:disabled { opacity: .5; cursor: wait; }
+  #msg { margin-top: .6rem; min-height: 1.4em; font-size: .9rem; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); }
+  th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  tbody tr.selected { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  td.score { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .status-pill {
+    display: inline-block; padding: .05rem .55rem; border: 1px solid var(--line);
+    border-radius: 999px; font-size: .8rem; color: var(--muted); white-space: nowrap;
+  }
+  #detail dl { display: grid; grid-template-columns: 10rem 1fr; gap: .2rem .8rem; margin: 0 0 .75rem; }
+  #detail dt { color: var(--muted); } #detail dd { margin: 0; overflow-wrap: anywhere; }
+  #detail pre {
+    white-space: pre-wrap; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 6px; padding: .75rem; max-height: 22rem; overflow: auto; font-size: .85rem;
+  }
+  .inline { display: inline-flex; gap: .5rem; align-items: center; }
+  .inline select { width: auto; }
+  .inline button { margin-top: 0; }
+  .hint { color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+
+<h1>Job Search Assistant</h1>
+<div id="funnel">loading…</div>
+
+<section>
+  <h2>Add a job (paste from LinkedIn or anywhere)</h2>
+  <label for="url">Job posting URL</label>
+  <input type="text" id="url" placeholder="https://www.linkedin.com/jobs/view/…">
+  <label for="jd">Job description (paste the full text)</label>
+  <textarea id="jd" placeholder="Paste the job description here…"></textarea>
+  <div class="inline" style="margin-top:.5rem">
+    <input type="checkbox" id="rank-on-add" checked>
+    <label for="rank-on-add" style="margin:0">Rank against my profile right away</label>
+  </div>
+  <button id="add-btn">Add job</button>
+  <div id="msg"></div>
+</section>
+
+<section>
+  <h2>Jobs</h2>
+  <div class="row">
+    <div class="narrow">
+      <label for="min-score">Min score</label>
+      <input type="number" id="min-score" min="0" max="100" placeholder="e.g. 70">
+    </div>
+    <div class="narrow">
+      <label for="status-filter">Status</label>
+      <select id="status-filter"><option value="">all</option></select>
+    </div>
+    <div class="narrow">
+      <button id="refresh-btn" class="secondary">Refresh</button>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>id</th><th>score</th><th>company</th><th>title</th><th>location</th><th>status</th></tr></thead>
+    <tbody id="jobs-body"><tr><td colspan="6" class="hint">loading…</td></tr></tbody>
+  </table>
+</section>
+
+<section id="detail" hidden>
+  <h2 id="detail-title"></h2>
+  <dl id="detail-meta"></dl>
+  <div class="inline">
+    <label for="status-set" style="margin:0">Set status:</label>
+    <select id="status-set"></select>
+    <button id="status-btn">Update</button>
+    <button id="rank-btn" class="secondary">Rank now</button>
+  </div>
+  <div id="detail-msg" style="min-height:1.4em;margin-top:.4rem;font-size:.9rem"></div>
+  <h2 style="margin-top:1rem">Description (verbatim)</h2>
+  <pre id="detail-desc"></pre>
+</section>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let LIFECYCLE = [];
+let selectedId = null;
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || res.statusText);
+  return body;
+}
+
+function setMsg(el, text, cls) { el.textContent = text || ""; el.className = cls || ""; }
+
+async function loadReport() {
+  const r = await api("/api/report");
+  LIFECYCLE = r.lifecycle;
+  const parts = r.lifecycle.filter(s => r.counts[s]).map(s => `${s} ${r.counts[s]}`);
+  $("funnel").textContent = r.total
+    ? `${r.total} job${r.total === 1 ? "" : "s"} — ` + parts.join(" · ")
+    : "No jobs yet — paste your first one below.";
+  for (const sel of [$("status-filter"), $("status-set")]) {
+    const keep = sel.value;
+    sel.length = sel === $("status-filter") ? 1 : 0;
+    for (const s of r.lifecycle) sel.add(new Option(s, s));
+    sel.value = keep;
+  }
+}
+
+async function loadJobs() {
+  const q = new URLSearchParams();
+  if ($("min-score").value !== "") q.set("min_score", $("min-score").value);
+  if ($("status-filter").value) q.set("status", $("status-filter").value);
+  const jobs = await api("/api/jobs?" + q);
+  const tbody = $("jobs-body");
+  tbody.textContent = "";
+  if (!jobs.length) {
+    const tr = tbody.insertRow(); const td = tr.insertCell();
+    td.colSpan = 6; td.className = "hint"; td.textContent = "No jobs match.";
+    return;
+  }
+  for (const j of jobs) {
+    const tr = tbody.insertRow();
+    tr.dataset.id = j.id;
+    if (j.id === selectedId) tr.className = "selected";
+    tr.insertCell().textContent = j.id;
+    const sc = tr.insertCell(); sc.className = "score";
+    sc.textContent = j.relevance_score ?? "–";
+    tr.insertCell().textContent = j.company_name || "";
+    tr.insertCell().textContent = j.title || "";
+    tr.insertCell().textContent = j.location || "–";
+    const st = tr.insertCell();
+    const pill = document.createElement("span");
+    pill.className = "status-pill"; pill.textContent = j.status;
+    st.appendChild(pill);
+    tr.addEventListener("click", () => openDetail(j.id));
+  }
+}
+
+async function openDetail(id) {
+  const j = await api("/api/jobs/" + id);
+  selectedId = id;
+  $("detail").hidden = false;
+  $("detail-title").textContent = `Job ${j.id}: ${j.company_name} — ${j.title}`;
+  const meta = $("detail-meta");
+  meta.textContent = "";
+  const rows = [
+    ["status", `${j.status} (since ${j.status_updated_at})`],
+    ["score", j.relevance_score ?? "not ranked yet"],
+    ["rationale", j.relevance_rationale || "–"],
+    ["location", j.location || "–"],
+    ["remote type", j.remote_type],
+    ["posted", j.posted_at || "–"],
+    ["discovered", j.discovered_at],
+    ["url", j.source_url],
+  ];
+  for (const [k, v] of rows) {
+    const dt = document.createElement("dt"); dt.textContent = k;
+    const dd = document.createElement("dd");
+    if (k === "url") {
+      const a = document.createElement("a");
+      a.href = j.source_url; a.target = "_blank"; a.rel = "noopener";
+      a.textContent = j.source_url; dd.appendChild(a);
+    } else dd.textContent = v;
+    meta.append(dt, dd);
+  }
+  $("status-set").value = j.status;
+  $("detail-desc").textContent = j.description_text;
+  setMsg($("detail-msg"), "");
+  document.querySelectorAll("#jobs-body tr").forEach(tr =>
+    tr.classList.toggle("selected", Number(tr.dataset.id) === id));
+  $("detail").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function refreshAll() { await loadReport(); await loadJobs(); }
+
+$("add-btn").addEventListener("click", async () => {
+  const btn = $("add-btn");
+  btn.disabled = true;
+  setMsg($("msg"), "Extracting fields with the LLM…");
+  try {
+    const r = await api("/api/jobs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: $("url").value, jd_text: $("jd").value,
+        rank: $("rank-on-add").checked,
+      }),
+    });
+    if (r.duplicate) {
+      setMsg($("msg"), `Already stored as job ${r.job_id} — nothing added.`, "warn");
+    } else if (r.warning) {
+      setMsg($("msg"), `Stored as job ${r.job_id}. ${r.warning}`, "warn");
+    } else {
+      const score = r.job.relevance_score;
+      setMsg($("msg"),
+        `Stored as job ${r.job_id}` + (score != null ? ` — score ${score}.` : "."), "ok");
+      $("url").value = ""; $("jd").value = "";
+    }
+    await refreshAll();
+    await openDetail(r.job_id);
+  } catch (e) {
+    setMsg($("msg"), "Error: " + e.message, "err");
+  } finally { btn.disabled = false; }
+});
+
+$("status-btn").addEventListener("click", async () => {
+  if (selectedId == null) return;
+  try {
+    await api(`/api/jobs/${selectedId}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: $("status-set").value }),
+    });
+    setMsg($("detail-msg"), "Status updated.", "ok");
+    await refreshAll(); await openDetail(selectedId);
+  } catch (e) { setMsg($("detail-msg"), "Error: " + e.message, "err"); }
+});
+
+$("rank-btn").addEventListener("click", async () => {
+  if (selectedId == null) return;
+  const btn = $("rank-btn");
+  btn.disabled = true;
+  setMsg($("detail-msg"), "Ranking against your profile…");
+  try {
+    await api(`/api/jobs/${selectedId}/rank`, { method: "POST" });
+    setMsg($("detail-msg"), "Ranked.", "ok");
+    await refreshAll(); await openDetail(selectedId);
+  } catch (e) { setMsg($("detail-msg"), "Error: " + e.message, "err"); }
+  finally { btn.disabled = false; }
+});
+
+$("refresh-btn").addEventListener("click", refreshAll);
+$("status-filter").addEventListener("change", loadJobs);
+$("min-score").addEventListener("change", loadJobs);
+
+refreshAll().catch(e => setMsg($("msg"), "Error: " + e.message, "err"));
+</script>
+</body>
+</html>
