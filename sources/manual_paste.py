@@ -12,6 +12,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+import config
 import llm
 
 SOURCE_NAME = "manual_paste"
@@ -47,6 +48,7 @@ def capture(url: str, jd_text: str, *, client=None) -> RawPosting:
         "extract_job",
         ExtractedJobFields,
         client=client,
+        model=config.MODEL_EXTRACT,
         url=url,
         jd_text=jd_text,
         today=date.today().isoformat(),

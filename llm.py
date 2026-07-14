@@ -92,22 +92,28 @@ def call(
     output_model: type[T],
     *,
     client: genai.Client | None = None,
+    model: str | None = None,
+    max_tokens: int | None = None,
     **variables: object,
 ) -> T:
     """Render a prompt template and return a validated ``output_model`` instance.
 
     ``client`` is injectable so tests can pass a mock — tests must never hit
-    the live API.
+    the live API. ``model``/``max_tokens`` let each pipeline step pick its own
+    settings (config.MODEL_EXTRACT, MAX_TOKENS_TAILOR, ...); omitted, they
+    fall back to the global config.MODEL / config.MAX_TOKENS.
     """
     client = client or get_client()
+    model = model or config.MODEL
+    max_tokens = max_tokens or config.MAX_TOKENS
     prompt = render_prompt(prompt_name, **variables)
     response = client.models.generate_content(
-        model=config.MODEL,
+        model=model,
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=output_model,
-            max_output_tokens=config.MAX_TOKENS,
+            max_output_tokens=max_tokens,
         ),
     )
 
@@ -119,6 +125,9 @@ def call(
         raise LLMError(f"LLM blocked the '{prompt_name}' request ({block_reason})")
 
     finish = _finish_reason_name(response)
+    # Log finish_reason unconditionally so a MAX_TOKENS cutoff is visible in
+    # the logs even before (or without) the raise below.
+    log.info("llm call prompt=%s model=%s finish_reason=%s", prompt_name, model, finish)
     if finish in _BAD_FINISH_REASONS:
         raise LLMError(
             f"LLM did not complete the '{prompt_name}' request (finish_reason={finish})"
@@ -135,7 +144,7 @@ def call(
     if usage is not None:
         log.info(
             "llm call prompt=%s model=%s input_tokens=%s output_tokens=%s",
-            prompt_name, config.MODEL,
+            prompt_name, model,
             getattr(usage, "prompt_token_count", None),
             getattr(usage, "candidates_token_count", None),
         )

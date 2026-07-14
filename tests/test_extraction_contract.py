@@ -30,7 +30,7 @@ def test_capture_sends_url_and_jd_and_keeps_text_verbatim():
     # Input contract: the rendered prompt carries the URL and full JD text.
     assert SAMPLE_URL in client.last_prompt
     assert "Acme AI Labs is building retrieval-augmented" in client.last_prompt
-    assert client.calls[-1]["model"] == config.MODEL
+    assert client.calls[-1]["model"] == config.MODEL_EXTRACT
     assert client.calls[-1]["config"].response_schema is ExtractedJobFields
 
     # Output contract: fields land on the posting; JD is stored verbatim.

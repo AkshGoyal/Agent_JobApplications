@@ -14,6 +14,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+import config
 import llm
 import profile_kb
 from db import repo
@@ -66,6 +67,7 @@ def answer_question(
         "answer_question",
         AnswerResult,
         client=client,
+        model=config.MODEL_ANSWER,
         canned_context=profile_kb.canned_context(),
         profile_context=profile_kb.tailoring_context(),
         company=job["company_name"],
