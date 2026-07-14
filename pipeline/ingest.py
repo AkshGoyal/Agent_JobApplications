@@ -21,16 +21,26 @@ class IngestResult:
 
 
 def ingest_pasted_job(
-    conn: sqlite3.Connection, url: str, jd_text: str, *, client=None
+    conn: sqlite3.Connection,
+    url: str,
+    jd_text: str,
+    *,
+    client=None,
+    source_name: str = manual_paste.SOURCE_NAME,
 ) -> IngestResult:
     """Ingest one manually pasted job. Returns the new job id, or the existing
-    job id with ``duplicate=True`` when the posting is already stored."""
+    job id with ``duplicate=True`` when the posting is already stored.
+
+    ``source_name`` records how the paste arrived (CLI/web paste vs. the
+    Chrome extension's one-click capture) — same extraction/storage either
+    way, just a label for ``job.source``.
+    """
     if not url.strip():
         raise ValueError("a job URL is required")
     if not jd_text.strip():
         raise ValueError("the pasted job description is empty")
 
-    raw = manual_paste.capture(url.strip(), jd_text, client=client)
+    raw = manual_paste.capture(url.strip(), jd_text, client=client, source_name=source_name)
     posting = normalize.normalize(raw)
     fingerprint = dedup.dedup_hash(posting.company_name, posting.title, posting.location)
 

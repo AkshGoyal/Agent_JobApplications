@@ -158,3 +158,52 @@ def test_assets_endpoint_lists_generated_materials(client, monkeypatch, tmp_path
     assets = client.get(f"/api/jobs/{job_id}/assets").json()
     assert {a["kind"] for a in assets} == {"cv_bullets", "cover_letter"}
     assert client.get("/api/jobs/999/assets").status_code == 404
+
+
+def test_capture_endpoint_stores_job_with_extension_source(client, monkeypatch):
+    _mock_llm(monkeypatch, make_response(FIELDS), make_response(RANKING))
+    res = client.post(
+        "/api/ingest/capture",
+        json={"url": "https://linkedin.com/jobs/view/1", "jd_text": "Full page text...", "rank": True},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["duplicate"] is False
+    assert body["job"]["source"] == "extension_capture"
+    assert body["job"]["relevance_score"] == 88
+
+
+def test_capture_endpoint_reports_duplicate(client, monkeypatch):
+    _mock_llm(monkeypatch, make_response(FIELDS), make_response(RANKING))
+    first = client.post(
+        "/api/ingest/capture",
+        json={"url": "https://linkedin.com/jobs/view/2", "jd_text": "JD text", "rank": True},
+    ).json()
+
+    _mock_llm(monkeypatch, make_response(FIELDS))
+    dup = client.post(
+        "/api/ingest/capture",
+        json={"url": "https://linkedin.com/jobs/view/other", "jd_text": "JD text", "rank": False},
+    ).json()
+    assert dup["duplicate"] is True
+    assert dup["job_id"] == first["job_id"]
+
+
+def test_capture_endpoint_rejects_empty_text(client, monkeypatch):
+    _mock_llm(monkeypatch, make_response(FIELDS))
+    res = client.post(
+        "/api/ingest/capture", json={"url": "https://e.com", "jd_text": "   "}
+    )
+    assert res.status_code == 400
+
+
+def test_capture_endpoint_allows_chrome_extension_origin(client, monkeypatch):
+    _mock_llm(monkeypatch, make_response(FIELDS), make_response(RANKING))
+    origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"
+    res = client.post(
+        "/api/ingest/capture",
+        json={"url": "https://linkedin.com/jobs/view/3", "jd_text": "JD text", "rank": True},
+        headers={"Origin": origin},
+    )
+    assert res.status_code == 200
+    assert res.headers["access-control-allow-origin"] == origin

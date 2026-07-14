@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    width: 280px; font: 13px/1.4 system-ui, -apple-system, sans-serif;
+    padding: .75rem; margin: 0; color: #1a1a1a;
+  }
+  label { display: block; font-size: .8rem; color: #666; margin: .5rem 0 .15rem; }
+  input[type=text] {
+    width: 100%; padding: .35rem .5rem; border: 1px solid #ccc;
+    border-radius: 4px; font: inherit; box-sizing: border-box;
+  }
+  button {
+    width: 100%; margin-top: .6rem; padding: .5rem; border: none;
+    border-radius: 4px; background: #0b57d0; color: #fff; font: inherit;
+    cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: wait; }
+  #status { margin-top: .5rem; min-height: 1.2em; font-size: .85rem; }
+  .ok { color: #1a7f37; } .err { color: #c62828; } .warn { color: #9a6700; }
+  .hint { color: #888; font-size: .75rem; margin-top: .5rem; }
+</style>
+</head>
+<body>
+  <label for="base-url">Job Search Assistant URL</label>
+  <input type="text" id="base-url" placeholder="http://localhost:8000">
+  <button id="capture-btn">Capture this job</button>
+  <div id="status"></div>
+  <div class="hint">
+    Reads only the page you're currently viewing, and only when you click
+    the button above. Nothing runs in the background; nothing logs into or
+    scrapes LinkedIn.
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
