@@ -59,6 +59,10 @@ class StatusRequest(BaseModel):
     status: str
 
 
+class DeadlineRequest(BaseModel):
+    deadline: str | None = None
+
+
 class AnswerRequest(BaseModel):
     question: str
 
@@ -163,6 +167,17 @@ def api_set_status(job_id: int, req: StatusRequest):
     with closing(database.connect()) as conn:
         try:
             repo.set_status(conn, job_id, req.status)
+        except ValueError as exc:
+            code = 404 if "no job" in str(exc) else 400
+            raise HTTPException(status_code=code, detail=str(exc))
+        return dict(repo.get_job(conn, job_id))
+
+
+@app.post("/api/jobs/{job_id}/deadline")
+def api_set_deadline(job_id: int, req: DeadlineRequest):
+    with closing(database.connect()) as conn:
+        try:
+            repo.set_deadline(conn, job_id, req.deadline)
         except ValueError as exc:
             code = 404 if "no job" in str(exc) else 400
             raise HTTPException(status_code=code, detail=str(exc))

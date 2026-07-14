@@ -8,6 +8,7 @@
     python -m cli.main status-report
     python -m cli.main tailor <JOB_ID>
     python -m cli.main answer <JOB_ID> "question text"
+    python -m cli.main deadline <JOB_ID> <YYYY-MM-DD|clear>
 """
 
 import sys
@@ -182,6 +183,26 @@ def status(
     )
 
 
+@app.command()
+def deadline(
+    job_id: int = typer.Argument(..., help="Job id (see `list`)."),
+    value: str = typer.Argument(..., help="YYYY-MM-DD, or 'clear' to remove it."),
+):
+    """Set or clear a job's application deadline."""
+    conn = _connect()
+    new_deadline = None if value.lower() == "clear" else value
+    try:
+        repo.set_deadline(conn, job_id, new_deadline)
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1)
+    job = repo.get_job(conn, job_id)
+    typer.echo(
+        f"Job {job_id} ({job['company_name']} — {job['title']}) "
+        f"deadline → {job['application_deadline'] or '-'}"
+    )
+
+
 @app.command("status-report")
 def status_report():
     """Show the funnel: how many jobs sit in each lifecycle stage."""
@@ -248,6 +269,7 @@ def show(job_id: int = typer.Argument(..., help="Job id (see `list`).")):
 
     typer.echo(f"Job {job['id']}: {job['company_name']} — {job['title']}")
     typer.echo(f"  status:        {job['status']} (since {job['status_updated_at']})")
+    typer.echo(f"  deadline:      {job['application_deadline'] or '-'}")
     typer.echo(f"  location:      {job['location'] or '-'}")
     typer.echo(f"  remote_type:   {job['remote_type']}")
     typer.echo(f"  source:        {job['source']}")
