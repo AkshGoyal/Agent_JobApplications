@@ -42,8 +42,15 @@ class RawPosting:
     posted_at: str | None
 
 
-def capture(url: str, jd_text: str, *, client=None) -> RawPosting:
-    """Build a RawPosting from a URL + pasted JD via LLM field extraction."""
+def capture(
+    url: str, jd_text: str, *, client=None, source_name: str = SOURCE_NAME
+) -> RawPosting:
+    """Build a RawPosting from a URL + pasted JD via LLM field extraction.
+
+    ``source_name`` distinguishes *how* the paste reached us (manual CLI/web
+    paste vs. the one-click extension capture) — the extraction and storage
+    behavior is identical either way; this is a label only, never a fetch.
+    """
     fields = llm.call(
         "extract_job",
         ExtractedJobFields,
@@ -54,7 +61,7 @@ def capture(url: str, jd_text: str, *, client=None) -> RawPosting:
         today=date.today().isoformat(),
     )
     return RawPosting(
-        source=SOURCE_NAME,
+        source=source_name,
         source_url=url,
         description_text=jd_text,
         company_name=fields.company_name,

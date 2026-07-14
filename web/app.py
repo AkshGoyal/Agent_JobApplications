@@ -14,6 +14,7 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -24,13 +25,31 @@ from pipeline import answer as answer_pipeline
 from pipeline import ingest as ingest_pipeline
 from pipeline import rank as rank_pipeline
 from pipeline import tailor as tailor_pipeline
+from sources import manual_paste
 
 STATIC_DIR = Path(__file__).parent / "static"
+EXTENSION_SOURCE_NAME = "extension_capture"
 
 app = FastAPI(title="Job Search Assistant")
 
+# The Chrome extension's popup fetches this API from a chrome-extension://
+# origin. No other origin gets CORS access — this is a local single-user
+# tool, not a hosted multi-origin service.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r"^chrome-extension://.*$",
+    allow_methods=["POST"],
+    allow_headers=["content-type"],
+)
+
 
 class IngestRequest(BaseModel):
+    url: str
+    jd_text: str
+    rank: bool = True
+
+
+class CaptureRequest(BaseModel):
     url: str
     jd_text: str
     rank: bool = True
@@ -42,6 +61,32 @@ class StatusRequest(BaseModel):
 
 class AnswerRequest(BaseModel):
     question: str
+
+
+def _ingest_and_maybe_rank(
+    conn, url: str, jd_text: str, rank: bool, *, source_name: str
+) -> dict:
+    """Shared body of POST /api/jobs and POST /api/ingest/capture: store
+    first, rank after — a ranking failure never loses the paste."""
+    try:
+        result = ingest_pipeline.ingest_pasted_job(
+            conn, url, jd_text, source_name=source_name
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except llm.LLMError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    payload = {"job_id": result.job_id, "duplicate": result.duplicate, "warning": None}
+    if rank and not result.duplicate:
+        try:
+            rank_pipeline.rank_job(conn, result.job_id)
+        except llm.LLMError as exc:
+            payload["warning"] = (
+                f"stored, but ranking failed ({exc}) — use 'Rank now' to retry"
+            )
+    payload["job"] = dict(repo.get_job(conn, result.job_id))
+    return payload
 
 
 def _require_api_key() -> None:
@@ -80,27 +125,24 @@ def api_add_job(req: IngestRequest):
     loses the paste; it comes back as a warning instead of an error."""
     _require_api_key()
     with closing(database.connect()) as conn:
-        try:
-            result = ingest_pipeline.ingest_pasted_job(conn, req.url, req.jd_text)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
-        except llm.LLMError as exc:
-            raise HTTPException(status_code=502, detail=str(exc))
+        return _ingest_and_maybe_rank(
+            conn, req.url, req.jd_text, req.rank, source_name=manual_paste.SOURCE_NAME
+        )
 
-        payload = {
-            "job_id": result.job_id,
-            "duplicate": result.duplicate,
-            "warning": None,
-        }
-        if req.rank and not result.duplicate:
-            try:
-                rank_pipeline.rank_job(conn, result.job_id)
-            except llm.LLMError as exc:
-                payload["warning"] = (
-                    f"stored, but ranking failed ({exc}) — use 'Rank now' to retry"
-                )
-        payload["job"] = dict(repo.get_job(conn, result.job_id))
-    return payload
+
+@app.post("/api/ingest/capture")
+def api_ingest_capture(req: CaptureRequest):
+    """One-click capture from the Chrome extension: same store-first/rank-after
+    pipeline as manual paste, just labeled with a different job.source so
+    captures are distinguishable from paste-in-the-UI jobs. The extension
+    sends the raw visible-page text; extraction is entirely server-side LLM
+    parsing here, same as every other ingest path — the extension never
+    fetches or scrapes anything itself."""
+    _require_api_key()
+    with closing(database.connect()) as conn:
+        return _ingest_and_maybe_rank(
+            conn, req.url, req.jd_text, req.rank, source_name=EXTENSION_SOURCE_NAME
+        )
 
 
 @app.post("/api/jobs/{job_id}/rank")
