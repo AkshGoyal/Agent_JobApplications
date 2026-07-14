@@ -70,6 +70,13 @@ def test_tailor_job_writes_files_asset_rows_and_advances_status(conn, tmp_path, 
 
     result = tailor.tailor_job(conn, job_id, client=client)
 
+    # Both tailor calls use the tailor-specific model + raised token cap
+    # (generation needs headroom — a 2048 cap truncates long responses).
+    import config as config_module
+    for call_kwargs in client.calls:
+        assert call_kwargs["model"] == config_module.MODEL_TAILOR
+        assert call_kwargs["config"].max_output_tokens == config_module.MAX_TOKENS_TAILOR
+
     assert result.warnings == []
     assert result.cv_path.exists()
     assert result.cover_letter_path.exists()

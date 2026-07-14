@@ -43,6 +43,9 @@ def test_canned_answer_with_filled_field_is_used_verbatim(conn):
     assert record.source == "canned"
     assert record.answer == "2 months"
 
+    import config
+    assert client.calls[-1]["model"] == config.MODEL_ANSWER
+
     assets = repo.list_generated_assets(conn, job_id)
     assert len(assets) == 1
     assert assets[0]["kind"] == "form_answer"

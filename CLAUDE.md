@@ -70,8 +70,15 @@ python -m cli.main answer <JOB_ID> "question text"
 
 ## Web UI
 
+Run **from the repo root** (`python -m` resolves packages from the current
+directory — running it from anywhere else fails with
+`ModuleNotFoundError: No module named 'web'`):
+
 ```bash
-python -m web.app        # http://localhost:8000 (Codespaces auto-forwards port 8000)
+cd /workspaces/Agent_JobApplications   # Codespaces repo root; adjust locally
+python -m web.app                      # http://localhost:8000 (Codespaces auto-forwards port 8000)
+# equivalent alternative:
+python -m uvicorn web.app:app --host 0.0.0.0 --port 8000
 ```
 
 One static page over the same pipeline: paste a JD (add & rank), browse and
@@ -129,6 +136,22 @@ pip install -r requirements.txt
 export GEMINI_API_KEY=...   # from Google AI Studio; never commit this
 pytest                     # offline, mocked LLM — no key needed
 ```
+
+### Model/env-var configuration (all optional; defaults in `config.py`)
+
+| Env var | Default | Controls |
+|---|---|---|
+| `JOBSEARCH_MODEL` | `gemini-3.5-flash` | global fallback model |
+| `JOBSEARCH_MODEL_EXTRACT` | global | JD field extraction (`ingest paste`) |
+| `JOBSEARCH_MODEL_RANK` | global | relevance scoring (`rank`) |
+| `JOBSEARCH_MODEL_TAILOR` | global | CV bullets + cover letter (`tailor`) |
+| `JOBSEARCH_MODEL_ANSWER` | global | application Q&A (`answer`) |
+| `JOBSEARCH_MAX_TOKENS_TAILOR` | `16384` | output-token cap for both tailor calls |
+| `JOBSEARCH_DB` | `jobsearch.db` | SQLite path |
+
+To cut costs, `gemini-3.1-flash-lite` (~6x cheaper) is a good fit for
+extract/rank/answer — but do **not** use `gemini-2.5-flash-lite`
+(retired for new API keys; shuts down Oct 2026).
 
 Smoke test (needs a real API key):
 

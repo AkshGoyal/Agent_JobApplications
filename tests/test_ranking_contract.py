@@ -3,6 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
+import config
 import llm
 from db import repo
 from pipeline import ingest, rank
@@ -30,6 +31,7 @@ def test_rank_prompt_contains_profile_and_job(conn):
     assert "Acme AI Labs" in prompt                 # job company present
     assert "retrieval-augmented" in prompt          # JD text present
     assert client.calls[-1]["config"].response_schema is RankingResult
+    assert client.calls[-1]["model"] == config.MODEL_RANK
 
     # Output contract: score + rationale persisted, status advanced.
     assert ranked.score == 85

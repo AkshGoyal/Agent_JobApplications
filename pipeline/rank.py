@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
 
+import config
 import llm
 import profile_kb
 from db import repo
@@ -39,6 +40,7 @@ def rank_job(conn: sqlite3.Connection, job_id: int, *, client=None) -> RankedJob
         "rank_job",
         RankingResult,
         client=client,
+        model=config.MODEL_RANK,
         profile_context=profile_kb.ranking_context(),
         company=job["company_name"],
         title=job["title"],
