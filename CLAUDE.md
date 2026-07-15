@@ -42,7 +42,7 @@ prompts/          # readable prompt template files (never scattered f-strings)
 db/               # migrations, connection, repository functions
 sources/          # one module per job source (Phase 1: manual_paste)
 pipeline/         # normalize → dedup → ingest → rank
-cli/              # Typer app: ingest paste, rank, list, show, status, status-report, tailor, answer
+cli/              # Typer app: ingest paste, rank, list, show, status, status-report, tailor, answer, deadline
 web/              # FastAPI app + single static page — same pipeline, in the browser
 profile/          # my knowledge base: facts.yaml, narratives.md, canned_answers.yaml, cv_canonical.pdf,
                   #   cv_canonical_structure.yaml (ground-truth CV entries for tailor)
@@ -66,6 +66,7 @@ python -m cli.main status <JOB_ID> <STAGE>   # e.g. status 3 applied — always 
 python -m cli.main status-report             # funnel counts per lifecycle stage
 python -m cli.main tailor <JOB_ID>           # CV bullet suggestions + cover letter draft
 python -m cli.main answer <JOB_ID> "question text"
+python -m cli.main deadline <JOB_ID> <YYYY-MM-DD|clear>
 ```
 
 ## Web UI
@@ -83,8 +84,13 @@ python -m uvicorn web.app:app --host 0.0.0.0 --port 8000
 
 One static page over the same pipeline: paste a JD (add & rank), browse and
 filter the ranked table, open a job's detail/rationale, change its status,
-and see the funnel. The web layer (`web/app.py`) contains no business logic —
-it must stay a thin JSON wrapper over `pipeline/` and `db/repo.py`.
+generate/view materials, ask application questions, and see the funnel. The
+**Tracker** section groups jobs by lifecycle status (collapsible per stage);
+each row expands to a deadline badge (amber ≤3 days out, red overdue) plus
+inline status/deadline controls and copy/download buttons for any generated
+CV bullets and cover letter. The web layer (`web/app.py`) contains no
+business logic — it must stay a thin JSON wrapper over `pipeline/` and
+`db/repo.py`.
 
 `ingest paste` reads the JD from `--file` or stdin (paste, then Ctrl-D). It
 always **stores first, ranks after** — a failed LLM call must never lose a

@@ -57,3 +57,24 @@ def test_status_counts_funnel(conn):
     repo.set_status(conn, b, "applied")
     repo.set_status(conn, c, "interview")
     assert repo.status_counts(conn) == {"applied": 2, "interview": 1}
+
+
+def test_set_deadline_sets_and_clears(conn):
+    job_id = _job(conn, 1)
+    repo.set_deadline(conn, job_id, "2026-08-01")
+    assert repo.get_job(conn, job_id)["application_deadline"] == "2026-08-01"
+    repo.set_deadline(conn, job_id, None)
+    assert repo.get_job(conn, job_id)["application_deadline"] is None
+
+
+def test_set_deadline_rejects_invalid_date(conn):
+    job_id = _job(conn, 1)
+    with pytest.raises(ValueError, match="invalid deadline"):
+        repo.set_deadline(conn, job_id, "not-a-date")
+    with pytest.raises(ValueError, match="invalid deadline"):
+        repo.set_deadline(conn, job_id, "08/01/2026")
+
+
+def test_set_deadline_rejects_unknown_job(conn):
+    with pytest.raises(ValueError, match="no job with id"):
+        repo.set_deadline(conn, 999, "2026-08-01")

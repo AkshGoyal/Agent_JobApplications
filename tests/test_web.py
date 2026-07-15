@@ -109,6 +109,28 @@ def test_status_endpoint_and_report(client, monkeypatch):
     assert report["counts"] == {"applied": 1} and report["total"] == 1
 
 
+def test_deadline_endpoint(client, monkeypatch):
+    job_id = _add_job(client, monkeypatch).json()["job_id"]
+    res = client.post(f"/api/jobs/{job_id}/deadline", json={"deadline": "2026-08-01"})
+    assert res.status_code == 200
+    assert res.json()["application_deadline"] == "2026-08-01"
+
+    cleared = client.post(f"/api/jobs/{job_id}/deadline", json={"deadline": None})
+    assert cleared.json()["application_deadline"] is None
+
+    assert client.post(f"/api/jobs/{job_id}/deadline",
+                       json={"deadline": "not-a-date"}).status_code == 400
+    assert client.post("/api/jobs/999/deadline",
+                       json={"deadline": "2026-08-01"}).status_code == 404
+
+
+def test_jobs_list_includes_deadline(client, monkeypatch):
+    job_id = _add_job(client, monkeypatch).json()["job_id"]
+    client.post(f"/api/jobs/{job_id}/deadline", json={"deadline": "2026-08-01"})
+    jobs = client.get("/api/jobs").json()
+    assert jobs[0]["application_deadline"] == "2026-08-01"
+
+
 def test_rank_endpoint(client, monkeypatch):
     job_id = _add_job(client, monkeypatch, rank=False).json()["job_id"]
     _mock_llm(monkeypatch, make_response(RANKING))

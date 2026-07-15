@@ -1,6 +1,7 @@
 """Repository functions — all SQL for company and job lives here."""
 
 import sqlite3
+from datetime import date
 
 # The job status lifecycle, in funnel order. Mirrors the CHECK constraint in
 # db/migrations/0001_initial.sql — keep the two in sync.
@@ -84,7 +85,7 @@ def list_jobs(
     status: str | None = None,
 ) -> list[sqlite3.Row]:
     query = """SELECT job.id, job.relevance_score, company.name AS company_name,
-                      job.title, job.location, job.status
+                      job.title, job.location, job.status, job.application_deadline
                FROM job JOIN company ON company.id = job.company_id"""
     clauses, params = [], []
     if min_score is not None:
@@ -123,6 +124,22 @@ def set_status(conn: sqlite3.Connection, job_id: int, status: str) -> None:
         """UPDATE job SET status = ?, status_updated_at = datetime('now')
            WHERE id = ?""",
         (status, job_id),
+    )
+    if cur.rowcount == 0:
+        raise ValueError(f"no job with id {job_id}")
+    conn.commit()
+
+
+def set_deadline(conn: sqlite3.Connection, job_id: int, deadline: str | None) -> None:
+    """Set or clear a job's application deadline. ``deadline`` must be an ISO
+    date string (YYYY-MM-DD) or None to clear it."""
+    if deadline is not None:
+        try:
+            date.fromisoformat(deadline)
+        except ValueError:
+            raise ValueError(f"invalid deadline '{deadline}' — expected YYYY-MM-DD")
+    cur = conn.execute(
+        "UPDATE job SET application_deadline = ? WHERE id = ?", (deadline, job_id)
     )
     if cur.rowcount == 0:
         raise ValueError(f"no job with id {job_id}")
