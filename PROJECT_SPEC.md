@@ -16,7 +16,9 @@ leave room for them without building them now.
 
 - No automated submission of applications, anywhere.
 - No LinkedIn automation of any kind (no scraping, no messaging, no login).
-- No email sending. (A future phase adds a human-approved outbox; not now.)
+- No email sending. (A future phase adds a human-approved outbox; not now.
+  Reading is allowed and scoped: read-only IMAP ingestion of LinkedIn
+  job-alert emails from my own inbox — see Phase 3.)
 - ~~No web UI in early phases. CLI first.~~ *(Lifted 2026-07-11 by owner
   decision: a local, single-user web UI now wraps the same pipeline functions
   as the CLI — see `web/`. Still no hosted/multi-user deployment.)*
@@ -134,9 +136,15 @@ about me.
 - Manual status transitions via CLI (`status <job_id> <stage>`) and web UI;
   `status-report` command / funnel strip showing the funnel
   (discovered / applied / interviewing / etc.)
-- (Later, separate design discussion: Gmail read-only ingestion to detect
-  confirmations/rejections — and to ingest LinkedIn job-alert emails as a
-  discovery source. Do not build yet.)
+- Gmail alert ingestion *(delivered 2026-07-15)*: `ingest gmail` reads
+  LinkedIn job-alert emails from my own inbox over **read-only IMAP**
+  (Google app password via env vars) and feeds each job card through the
+  same normalize → dedup → store pipeline as manual paste, tagged
+  `source="gmail_alert"`. Never sends/marks/moves email; never fetches
+  linkedin.com; job URLs stored as labels only. Alert jobs carry snippet-only
+  descriptions, flagged as such in the stored text.
+- (Later: detecting application confirmations/rejections in email as
+  *suggested* status changes — suggestions only, transitions stay manual.)
 
 **Phase 4+ (deferred, schema-only for now):** HR contact finder, outreach
 drafting, approval queue/outbox, alumni triage.
