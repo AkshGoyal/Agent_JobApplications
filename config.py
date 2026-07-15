@@ -47,3 +47,25 @@ OUTPUT_DIR = REPO_ROOT / "output"  # Phase 2: generated materials (gitignored)
 def api_key_present() -> bool:
     """True if a Gemini API key is available in the environment."""
     return bool(os.environ.get(API_KEY_ENV_VAR))
+
+
+# --- Gmail (read-only job-alert ingestion) ----------------------------------
+# The app never sends email and never logs into LinkedIn — it reads LinkedIn's
+# job-alert emails from YOUR inbox over IMAP, read-only. Credentials are a
+# Google "app password" (requires 2-Step Verification), set via env vars only:
+#   export GMAIL_ADDRESS=you@gmail.com
+#   export GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx   # myaccount.google.com/apppasswords
+GMAIL_ADDRESS_ENV_VAR = "GMAIL_ADDRESS"
+GMAIL_APP_PASSWORD_ENV_VAR = "GMAIL_APP_PASSWORD"
+IMAP_HOST = "imap.gmail.com"
+# Sender that identifies LinkedIn job-alert emails; override if LinkedIn
+# changes it or you want to ingest a different alert source's emails.
+ALERT_SENDER = os.environ.get("JOBSEARCH_ALERT_SENDER", "jobalerts-noreply@linkedin.com")
+
+
+def gmail_configured() -> bool:
+    """True if Gmail IMAP credentials are available in the environment."""
+    return bool(
+        os.environ.get(GMAIL_ADDRESS_ENV_VAR)
+        and os.environ.get(GMAIL_APP_PASSWORD_ENV_VAR)
+    )
