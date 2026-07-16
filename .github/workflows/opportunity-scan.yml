@@ -1,0 +1,70 @@
+name: Opportunities scan (weekly digest)
+
+# Runs the search-grounded Opportunities scan and posts the digest as a
+# GitHub Issue — the durable record, since this runner's SQLite DB is
+# ephemeral (gitignored, fresh machine each run; unlike the job pipeline,
+# there is no persistent dedup across runs here — each week's digest is
+# posted fresh). Spends Gemini quota on schedule, so the secret gate matters.
+#
+# Setup once: repo Settings -> Secrets and variables -> Actions ->
+#   New repository secret -> name: GEMINI_API_KEY, value: <your key>
+
+on:
+  schedule:
+    - cron: "30 2 * * 1"  # Monday 02:30 UTC (~08:00 IST)
+  workflow_dispatch:
+    inputs:
+      focus:
+        description: "Optional: steer this scan (e.g. 'quick commerce AI startups')"
+        required: false
+        default: ""
+
+permissions:
+  issues: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check the GEMINI_API_KEY secret is set
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::error::GEMINI_API_KEY secret is not set — add it under "\
+                 "Settings -> Secrets and variables -> Actions, then re-run."
+            exit 1
+          fi
+
+      - name: Run the scan
+        run: |
+          python -m cli.main opportunities scan --focus "${{ inputs.focus }}"
+
+      - name: Post the digest as a GitHub Issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          DIGEST_FILE=$(ls output/opportunities/*.md | sort | tail -n 1)
+          if [ -z "$DIGEST_FILE" ]; then
+            echo "::error::No digest file was written by the scan."
+            exit 1
+          fi
+          gh label create "opportunities-digest" \
+            --color "5319e7" --description "Weekly opportunities scan digest" \
+            --repo "${{ github.repository }}" 2>/dev/null || true
+          gh issue create \
+            --title "Opportunities scan — $(date -u +%Y-%m-%d)" \
+            --body-file "$DIGEST_FILE" \
+            --label "opportunities-digest" \
+            --repo "${{ github.repository }}"
