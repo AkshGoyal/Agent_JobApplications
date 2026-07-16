@@ -181,6 +181,65 @@ def list_generated_assets(conn: sqlite3.Connection, job_id: int) -> list[sqlite3
     ).fetchall()
 
 
+# --- opportunity -------------------------------------------------------------
+
+OPPORTUNITY_KINDS = ("startup", "ai_development", "learning", "entrepreneurship")
+OPPORTUNITY_STATUSES = ("new", "saved", "dismissed")
+
+
+def insert_opportunity(
+    conn: sqlite3.Connection,
+    *,
+    kind: str,
+    title: str,
+    summary: str,
+    why_relevant: str,
+    source_url: str | None,
+    suggested_action: str | None,
+    dedup_hash: str,
+) -> int | None:
+    """Insert one opportunity item; returns its id, or None if dedup_hash
+    already exists (silently skipped — the scan just found it again)."""
+    if conn.execute(
+        "SELECT 1 FROM opportunity WHERE dedup_hash = ?", (dedup_hash,)
+    ).fetchone():
+        return None
+    cur = conn.execute(
+        """INSERT INTO opportunity (kind, title, summary, why_relevant,
+                                     source_url, suggested_action, dedup_hash)
+           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+        (kind, title, summary, why_relevant, source_url, suggested_action, dedup_hash),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def list_opportunities(
+    conn: sqlite3.Connection, *, status: str | None = None
+) -> list[sqlite3.Row]:
+    query = "SELECT * FROM opportunity"
+    params: list[str] = []
+    if status is not None:
+        query += " WHERE status = ?"
+        params.append(status)
+    query += " ORDER BY created_at DESC, id DESC"
+    return conn.execute(query, params).fetchall()
+
+
+def set_opportunity_status(conn: sqlite3.Connection, opportunity_id: int, status: str) -> None:
+    if status not in OPPORTUNITY_STATUSES:
+        raise ValueError(
+            f"unknown opportunity status '{status}' — must be one of: "
+            + ", ".join(OPPORTUNITY_STATUSES)
+        )
+    cur = conn.execute(
+        "UPDATE opportunity SET status = ? WHERE id = ?", (status, opportunity_id)
+    )
+    if cur.rowcount == 0:
+        raise ValueError(f"no opportunity with id {opportunity_id}")
+    conn.commit()
+
+
 def set_ranking(
     conn: sqlite3.Connection, job_id: int, score: int, rationale: str
 ) -> None:

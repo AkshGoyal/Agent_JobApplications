@@ -246,6 +246,55 @@ def test_gmail_ingest_endpoint_without_credentials(client, monkeypatch):
     assert "Gmail is not configured" in res.json()["detail"]
 
 
+def test_opportunities_scan_endpoint(client, monkeypatch, tmp_path):
+    from pipeline.opportunities import OpportunityItem, OpportunityScanResult
+    monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path / "output")
+
+    scan_result = OpportunityScanResult(
+        overview="Found one relevant startup.",
+        items=[
+            OpportunityItem(
+                kind="startup", title="Acme AI Labs raises Series A",
+                summary="Raised $10M for agentic RAG tooling.",
+                why_relevant="Matches your AI/ML targets.",
+                source_url="https://example.com/acme", suggested_action="Check careers page.",
+            )
+        ],
+    )
+    _mock_llm(monkeypatch, make_response(scan_result))
+
+    res = client.post("/api/opportunities/scan", json={"focus": None})
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["new_ids"]) == 1
+    assert body["items"][0]["title"] == "Acme AI Labs raises Series A"
+
+    listed = client.get("/api/opportunities").json()
+    assert len(listed) == 1
+    assert listed[0]["kind"] == "startup"
+
+
+def test_opportunities_status_endpoint(client, monkeypatch, tmp_path):
+    from pipeline.opportunities import OpportunityItem, OpportunityScanResult
+    monkeypatch.setattr(config, "OUTPUT_DIR", tmp_path / "output")
+    scan_result = OpportunityScanResult(
+        overview="One item.",
+        items=[OpportunityItem(kind="learning", title="Learn RAGAS",
+                                summary="s", why_relevant="w")],
+    )
+    _mock_llm(monkeypatch, make_response(scan_result))
+    oid = client.post("/api/opportunities/scan", json={}).json()["new_ids"][0]
+
+    res = client.post(f"/api/opportunities/{oid}/status", json={"status": "saved"})
+    assert res.status_code == 200 and res.json()["status"] == "saved"
+
+    assert client.post(f"/api/opportunities/{oid}/status",
+                       json={"status": "bogus"}).status_code == 400
+    assert client.post("/api/opportunities/999/status",
+                       json={"status": "saved"}).status_code == 404
+    assert len(client.get("/api/opportunities", params={"status": "saved"}).json()) == 1
+
+
 def test_capture_endpoint_allows_chrome_extension_origin(client, monkeypatch):
     _mock_llm(monkeypatch, make_response(FIELDS), make_response(RANKING))
     origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"

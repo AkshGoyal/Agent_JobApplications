@@ -132,6 +132,24 @@ def canned_context() -> str:
     return "\n\n".join(parts)
 
 
+def opportunities_context() -> str:
+    """Compact profile context for the Opportunities scan: targets, skills,
+    and the career arc — enough to judge relevance of startups/AI news/
+    learning gaps without exposing identity/contact fields."""
+    facts = load_facts()
+    section_keys = ("targets", "skills", "experience", "projects")
+    sections = {k: facts[k] for k in section_keys if k in facts}
+    parts = []
+    arc = career_arc()
+    if arc:
+        parts.append(f"Career arc:\n{arc}")
+    parts.append(
+        "Profile facts (YAML):\n"
+        + yaml.dump(sections, sort_keys=False, allow_unicode=True)
+    )
+    return "\n\n".join(parts)
+
+
 def ranking_context() -> str:
     """Compact profile context for the ranking prompt.
 

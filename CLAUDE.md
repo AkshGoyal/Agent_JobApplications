@@ -44,7 +44,8 @@ prompts/          # readable prompt template files (never scattered f-strings)
 db/               # migrations, connection, repository functions
 sources/          # one module per job source: manual_paste, gmail_alerts
 pipeline/         # normalize → dedup → ingest → rank
-cli/              # Typer app: ingest paste, rank, list, show, status, status-report, tailor, answer, deadline
+cli/              # Typer app: ingest paste, rank, list, show, status, status-report, tailor, answer,
+                  #   deadline, opportunities scan/list/status
 web/              # FastAPI app + single static page — same pipeline, in the browser
 profile/          # my knowledge base: facts.yaml, narratives.md, canned_answers.yaml, cv_canonical.pdf,
                   #   cv_canonical_structure.yaml (ground-truth CV entries for tailor)
@@ -70,6 +71,9 @@ python -m cli.main status-report             # funnel counts per lifecycle stage
 python -m cli.main tailor <JOB_ID>           # CV bullet suggestions + cover letter draft
 python -m cli.main answer <JOB_ID> "question text"
 python -m cli.main deadline <JOB_ID> <YYYY-MM-DD|clear>
+python -m cli.main opportunities scan [--focus "text"]   # search-grounded market-intel scan
+python -m cli.main opportunities list [--status new]
+python -m cli.main opportunities status <ID> <new|saved|dismissed>
 ```
 
 ## Web UI
@@ -179,6 +183,22 @@ emails never include the full JD), so their scores are indicative — the
 stored description says so explicitly. Full-JD enrichment of an alert job is
 a possible follow-up feature.
 
+## Opportunities / market-intelligence scan
+
+`opportunities scan [--focus "text"]` runs one search-grounded LLM call
+(Gemini's built-in web-search tool, `llm.call(..., tools="web_search")`)
+filtered through `profile/facts.yaml`'s `targets`, surfacing up to 8 items
+across four kinds: `startup` (newly-funded/launching AI startups fitting my
+targets), `ai_development` (relevant recent AI news), `learning` (concrete
+skill gaps vs. what target roles expect), `entrepreneurship` (build-worthy
+angles in the above). Every item must be grounded in an actual search
+result — the prompt explicitly forbids inventing companies/facts. Deduped
+across scans by `(kind, title)` hash into the `opportunity` table (separate
+from `job` — these are never job postings and never touch the job
+lifecycle). Each scan also writes a Markdown digest to
+`output/opportunities/<date>.md`. Items are `new` / `saved` / `dismissed` —
+purely informational; nothing here is ever auto-applied to anything.
+
 To cut costs, `gemini-3.1-flash-lite` (~6x cheaper) is a good fit for
 extract/rank/answer — but do **not** use `gemini-2.5-flash-lite`
 (retired for new API keys; shuts down Oct 2026).
@@ -200,6 +220,10 @@ python -m cli.main show 1
   button that exercises the real Gemini flow on the sample JD. Add the key
   under **Settings → Secrets and variables → Actions** as `GEMINI_API_KEY`.
   Spends quota only when triggered; the DB is ephemeral per run.
+- **Opportunities scan (`.github/workflows/opportunity-scan.yml`)** runs
+  weekly (Mon 02:30 UTC) plus manual "Run workflow", and posts the digest as
+  a GitHub Issue labeled `opportunities-digest` — the durable record, since
+  the runner's DB is ephemeral. Uses the same `GEMINI_API_KEY` secret.
 - **Codespaces (`.devcontainer/`)** gives an interactive browser terminal for
   real use (paste JDs, read rankings). Add the key under **Settings → Secrets
   and variables → Codespaces** as `GEMINI_API_KEY`; it's injected as an env var.

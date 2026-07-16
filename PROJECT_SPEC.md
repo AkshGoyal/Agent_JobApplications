@@ -146,6 +146,18 @@ about me.
 - (Later: detecting application confirmations/rejections in email as
   *suggested* status changes — suggestions only, transitions stay manual.)
 
+**Opportunities / market-intelligence section** *(delivered 2026-07-16)*:
+a separate `opportunity` table (not job postings — never touches the job
+lifecycle) populated by `opportunities scan`, a single search-grounded LLM
+call (Gemini's built-in web-search tool combined with structured output)
+filtered through my profile `targets`. Surfaces newly-funded/launching
+startups, notable AI developments, concrete learning gaps, and
+entrepreneurship angles — grounded in real search results, never invented.
+Deduped across scans by `(kind, title)` hash. On-demand via CLI/web, plus a
+weekly GitHub Actions cron that posts the digest as a GitHub Issue (the CI
+runner's DB is ephemeral, so the Issue is the durable record). Items are
+`new` / `saved` / `dismissed` — purely informational, no automated action.
+
 **Phase 4+ (deferred, schema-only for now):** HR contact finder, outreach
 drafting, approval queue/outbox, alumni triage.
 
