@@ -26,6 +26,15 @@
   h1 { font-size: 1.3rem; margin: 0 0 .25rem; }
   h2 { font-size: 1rem; margin: 0 0 .75rem; }
   #funnel { color: var(--muted); margin-bottom: 1.25rem; min-height: 1.5em; }
+  #quicknav {
+    position: sticky; top: 0; z-index: 10; display: flex; gap: 1rem;
+    background: var(--bg); border-bottom: 1px solid var(--line);
+    padding: .6rem 0; margin: 0 0 .75rem;
+  }
+  #quicknav a {
+    color: var(--accent); text-decoration: none; font-size: .9rem; font-weight: 600;
+  }
+  #quicknav a:hover { text-decoration: underline; }
   section {
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;
@@ -118,9 +127,15 @@
 <body>
 
 <h1>Job Search Assistant</h1>
+<nav id="quicknav">
+  <a href="#add-section">Add job</a>
+  <a href="#jobs-section">Jobs</a>
+  <a href="#tracker-section">Tracker</a>
+  <a href="#opportunities-section">Opportunities</a>
+</nav>
 <div id="funnel">loading…</div>
 
-<section>
+<section id="add-section">
   <h2>Add a job (paste from LinkedIn or anywhere)</h2>
   <label for="url">Job posting URL</label>
   <input type="text" id="url" placeholder="https://www.linkedin.com/jobs/view/…">
@@ -137,8 +152,9 @@
   <div id="msg"></div>
 </section>
 
-<section>
+<section id="jobs-section">
   <h2>Jobs</h2>
+  <p class="hint">Every job, sorted by score. Click a row to open full details: rationale, description, generate materials, ask questions.</p>
   <div class="row">
     <div class="narrow">
       <label for="min-score">Min score</label>
@@ -158,13 +174,13 @@
   </table>
 </section>
 
-<section>
+<section id="tracker-section">
   <h2>Tracker</h2>
-  <p class="hint">Grouped by status. Click a row to view/copy materials and update status or deadline.</p>
+  <p class="hint">The same jobs, grouped by status with deadlines. Click a row for quick materials/status/deadline actions without leaving this view.</p>
   <div id="tracker-groups"><p class="hint">loading…</p></div>
 </section>
 
-<section>
+<section id="opportunities-section">
   <h2>Opportunities</h2>
   <p class="hint">
     Search-grounded scan for startups, AI developments, and learning gaps —
@@ -447,7 +463,11 @@ async function renderTrackerExpand(jobId, expandTd) {
   deadlineBtn.className = "secondary"; deadlineBtn.textContent = "Set deadline";
   const clearBtn = document.createElement("button");
   clearBtn.className = "secondary"; clearBtn.textContent = "Clear";
-  controls.append(statusSelect, statusBtn, deadlineInput, deadlineBtn, clearBtn);
+  const openDetailBtn = document.createElement("button");
+  openDetailBtn.className = "secondary";
+  openDetailBtn.textContent = "Open full details ↓";
+  openDetailBtn.addEventListener("click", () => openDetail(jobId));
+  controls.append(statusSelect, statusBtn, deadlineInput, deadlineBtn, clearBtn, openDetailBtn);
 
   const controlMsg = document.createElement("div");
   controlMsg.style.cssText = "min-height:1.2em;margin:.3rem 0;font-size:.85rem";
@@ -482,7 +502,7 @@ async function renderTrackerExpand(jobId, expandTd) {
   if (!cv && !letter) {
     const hint = document.createElement("p");
     hint.className = "hint";
-    hint.textContent = "No materials generated yet for this job — use the detail panel above to generate them.";
+    hint.textContent = "No materials generated yet for this job — click \"Open full details\" above to generate them.";
     materials.appendChild(hint);
   }
   for (const [label, asset, filename] of [
