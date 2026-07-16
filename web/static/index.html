@@ -98,6 +98,21 @@
     border-radius: 6px; padding: .6rem; max-height: 16rem; overflow: auto; font-size: .82rem;
     margin: 0;
   }
+
+  #opp-list h3.kind-heading {
+    text-transform: capitalize; font-size: .9rem; margin: .75rem 0 .4rem;
+    color: var(--muted);
+  }
+  .opp-card {
+    border: 1px solid var(--line); border-radius: 6px; padding: .6rem .75rem;
+    margin-bottom: .5rem; background: var(--bg);
+  }
+  .opp-card h4 { margin: 0 0 .25rem; font-size: .95rem; }
+  .opp-card p { margin: .25rem 0; font-size: .9rem; }
+  .opp-card .why { color: var(--muted); font-size: .85rem; font-style: italic; }
+  .opp-card .opp-actions { margin-top: .4rem; }
+  .opp-card .opp-actions button { margin: 0 .4rem .4rem 0; padding: .3rem .7rem; }
+  .opp-card.dismissed { opacity: .55; }
 </style>
 </head>
 <body>
@@ -147,6 +162,37 @@
   <h2>Tracker</h2>
   <p class="hint">Grouped by status. Click a row to view/copy materials and update status or deadline.</p>
   <div id="tracker-groups"><p class="hint">loading…</p></div>
+</section>
+
+<section>
+  <h2>Opportunities</h2>
+  <p class="hint">
+    Search-grounded scan for startups, AI developments, and learning gaps —
+    filtered through your profile targets. Not job postings; save or dismiss
+    what's useful.
+  </p>
+  <div class="row">
+    <div>
+      <label for="opp-focus">Focus (optional)</label>
+      <input type="text" id="opp-focus" placeholder="e.g. quick commerce AI startups">
+    </div>
+    <div class="narrow">
+      <button id="opp-scan-btn" class="secondary">Scan now</button>
+    </div>
+  </div>
+  <div id="opp-msg" style="min-height:1.4em;margin-top:.4rem;font-size:.9rem"></div>
+  <div class="row" style="margin-top:.5rem">
+    <div class="narrow">
+      <label for="opp-status-filter">Status</label>
+      <select id="opp-status-filter">
+        <option value="">all</option>
+        <option value="new">new</option>
+        <option value="saved">saved</option>
+        <option value="dismissed">dismissed</option>
+      </select>
+    </div>
+  </div>
+  <div id="opp-list"><p class="hint">loading…</p></div>
 </section>
 
 <section id="detail" hidden>
@@ -463,7 +509,66 @@ async function renderTrackerExpand(jobId, expandTd) {
   expandTd.append(controls, controlMsg, materials);
 }
 
-async function refreshAll() { await loadReport(); await loadJobs(); await loadTracker(); }
+async function loadOpportunities() {
+  const q = new URLSearchParams();
+  if ($("opp-status-filter").value) q.set("status", $("opp-status-filter").value);
+  const items = await api("/api/opportunities?" + q);
+  const container = $("opp-list");
+  container.textContent = "";
+  if (!items.length) {
+    container.innerHTML = '<p class="hint">No opportunities yet — run a scan above.</p>';
+    return;
+  }
+  const byKind = {};
+  for (const item of items) (byKind[item.kind] ??= []).push(item);
+  for (const [kind, kindItems] of Object.entries(byKind)) {
+    const h3 = document.createElement("h3");
+    h3.className = "kind-heading";
+    h3.textContent = kind.replace(/_/g, " ");
+    container.appendChild(h3);
+    for (const item of kindItems) {
+      const card = document.createElement("div");
+      card.className = "opp-card" + (item.status === "dismissed" ? " dismissed" : "");
+      const h4 = document.createElement("h4"); h4.textContent = item.title;
+      const summary = document.createElement("p"); summary.textContent = item.summary;
+      const why = document.createElement("p"); why.className = "why";
+      why.textContent = "Why relevant: " + item.why_relevant;
+      card.append(h4, summary, why);
+      if (item.source_url) {
+        const p = document.createElement("p");
+        const a = document.createElement("a");
+        a.href = item.source_url; a.target = "_blank"; a.rel = "noopener";
+        a.textContent = item.source_url;
+        p.appendChild(a); card.appendChild(p);
+      }
+      if (item.suggested_action) {
+        const p = document.createElement("p");
+        p.textContent = "Suggested: " + item.suggested_action;
+        card.appendChild(p);
+      }
+      const actions = document.createElement("div"); actions.className = "opp-actions";
+      for (const [label, status] of [["Save", "saved"], ["Dismiss", "dismissed"], ["Reset", "new"]]) {
+        if (item.status === status) continue;
+        const btn = document.createElement("button");
+        btn.className = "secondary"; btn.textContent = label;
+        btn.addEventListener("click", async () => {
+          try {
+            await api(`/api/opportunities/${item.id}/status`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status }),
+            });
+            await loadOpportunities();
+          } catch (e) { setMsg($("opp-msg"), "Error: " + e.message, "err"); }
+        });
+        actions.appendChild(btn);
+      }
+      card.appendChild(actions);
+      container.appendChild(card);
+    }
+  }
+}
+
+async function refreshAll() { await loadReport(); await loadJobs(); await loadTracker(); await loadOpportunities(); }
 
 $("add-btn").addEventListener("click", async () => {
   const btn = $("add-btn");
@@ -591,6 +696,25 @@ $("answer-btn").addEventListener("click", async () => {
     setMsg($("answer-msg"), "Error: " + e.message, "err");
   } finally { btn.disabled = false; }
 });
+
+$("opp-scan-btn").addEventListener("click", async () => {
+  const btn = $("opp-scan-btn");
+  btn.disabled = true;
+  setMsg($("opp-msg"), "Searching the web for relevant opportunities…");
+  try {
+    const r = await api("/api/opportunities/scan", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ focus: $("opp-focus").value.trim() || null }),
+    });
+    setMsg($("opp-msg"),
+      `${r.overview} — ${r.new_ids.length} new, ${r.duplicates} already seen.`, "ok");
+    await loadOpportunities();
+  } catch (e) {
+    setMsg($("opp-msg"), "Error: " + e.message, "err");
+  } finally { btn.disabled = false; }
+});
+$("opp-status-filter").addEventListener("change", loadOpportunities);
 
 $("refresh-btn").addEventListener("click", refreshAll);
 $("status-filter").addEventListener("change", loadJobs);
