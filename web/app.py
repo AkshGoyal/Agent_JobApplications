@@ -25,7 +25,7 @@ from pipeline import answer as answer_pipeline
 from pipeline import ingest as ingest_pipeline
 from pipeline import rank as rank_pipeline
 from pipeline import tailor as tailor_pipeline
-from sources import manual_paste
+from sources import gmail_alerts, manual_paste
 
 STATIC_DIR = Path(__file__).parent / "static"
 EXTENSION_SOURCE_NAME = "extension_capture"
@@ -65,6 +65,11 @@ class DeadlineRequest(BaseModel):
 
 class AnswerRequest(BaseModel):
     question: str
+
+
+class GmailIngestRequest(BaseModel):
+    days: int = 7
+    rank: bool = False
 
 
 def _ingest_and_maybe_rank(
@@ -147,6 +152,42 @@ def api_ingest_capture(req: CaptureRequest):
         return _ingest_and_maybe_rank(
             conn, req.url, req.jd_text, req.rank, source_name=EXTENSION_SOURCE_NAME
         )
+
+
+@app.post("/api/ingest/gmail")
+def api_ingest_gmail(req: GmailIngestRequest):
+    """Pull LinkedIn job-alert emails over read-only IMAP and ingest the job
+    cards found in them. Never sends email; never touches linkedin.com."""
+    _require_api_key()
+    if not config.gmail_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=f"Gmail is not configured — set {config.GMAIL_ADDRESS_ENV_VAR} and "
+            f"{config.GMAIL_APP_PASSWORD_ENV_VAR} in the server's environment "
+            "(a Google app password; see CLAUDE.md).",
+        )
+    with closing(database.connect()) as conn:
+        try:
+            result = gmail_alerts.ingest_alerts(conn, days=req.days)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except llm.LLMError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
+        warnings = []
+        if req.rank:
+            for job_id in result.new_job_ids:
+                try:
+                    rank_pipeline.rank_job(conn, job_id)
+                except llm.LLMError as exc:
+                    warnings.append(f"job {job_id}: ranking failed ({exc})")
+        return {
+            "emails_scanned": result.emails_scanned,
+            "new_job_ids": result.new_job_ids,
+            "duplicates": result.duplicates,
+            "warnings": warnings,
+            "jobs": [dict(repo.get_job(conn, jid)) for jid in result.new_job_ids],
+        }
 
 
 @app.post("/api/jobs/{job_id}/rank")

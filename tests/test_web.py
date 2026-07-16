@@ -219,6 +219,33 @@ def test_capture_endpoint_rejects_empty_text(client, monkeypatch):
     assert res.status_code == 400
 
 
+def test_gmail_ingest_endpoint(client, monkeypatch):
+    from sources import gmail_alerts
+    from tests.test_gmail_alerts import EXTRACTED, FakeIMAP, _alert_message
+
+    monkeypatch.setenv(config.GMAIL_ADDRESS_ENV_VAR, "user@example.com")
+    monkeypatch.setenv(config.GMAIL_APP_PASSWORD_ENV_VAR, "fake-app-password")
+    # The endpoint calls ingest_alerts without an imap kwarg; patch the
+    # connector so no live IMAP connection is ever attempted.
+    monkeypatch.setattr(gmail_alerts, "_connect_imap", lambda: FakeIMAP([_alert_message()]))
+    _mock_llm(monkeypatch, make_response(EXTRACTED))
+
+    res = client.post("/api/ingest/gmail", json={"days": 7, "rank": False})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["emails_scanned"] == 1
+    assert len(body["new_job_ids"]) == 2
+    assert body["jobs"][0]["source"] == "gmail_alert"
+
+
+def test_gmail_ingest_endpoint_without_credentials(client, monkeypatch):
+    monkeypatch.delenv(config.GMAIL_ADDRESS_ENV_VAR, raising=False)
+    monkeypatch.delenv(config.GMAIL_APP_PASSWORD_ENV_VAR, raising=False)
+    res = client.post("/api/ingest/gmail", json={})
+    assert res.status_code == 503
+    assert "Gmail is not configured" in res.json()["detail"]
+
+
 def test_capture_endpoint_allows_chrome_extension_origin(client, monkeypatch):
     _mock_llm(monkeypatch, make_response(FIELDS), make_response(RANKING))
     origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop"

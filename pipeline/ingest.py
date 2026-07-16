@@ -41,6 +41,12 @@ def ingest_pasted_job(
         raise ValueError("the pasted job description is empty")
 
     raw = manual_paste.capture(url.strip(), jd_text, client=client, source_name=source_name)
+    return store_posting(conn, raw)
+
+
+def store_posting(conn: sqlite3.Connection, raw: RawPosting) -> IngestResult:
+    """Normalize → dedup → store one RawPosting. The single storage path for
+    every source (manual paste, extension capture, gmail alerts, ...)."""
     posting = normalize.normalize(raw)
     fingerprint = dedup.dedup_hash(posting.company_name, posting.title, posting.location)
 

@@ -115,7 +115,10 @@
     <input type="checkbox" id="rank-on-add" checked>
     <label for="rank-on-add" style="margin:0">Rank against my profile right away</label>
   </div>
-  <button id="add-btn">Add job</button>
+  <div class="inline" style="margin-top:.75rem">
+    <button id="add-btn">Add job</button>
+    <button id="gmail-btn" class="secondary" title="Reads LinkedIn job-alert emails from your inbox over read-only IMAP — never sends anything, never touches linkedin.com.">Pull LinkedIn alerts (Gmail)</button>
+  </div>
   <div id="msg"></div>
 </section>
 
@@ -487,6 +490,30 @@ $("add-btn").addEventListener("click", async () => {
     }
     await refreshAll();
     await openDetail(r.job_id);
+  } catch (e) {
+    setMsg($("msg"), "Error: " + e.message, "err");
+  } finally { btn.disabled = false; }
+});
+
+$("gmail-btn").addEventListener("click", async () => {
+  const btn = $("gmail-btn");
+  btn.disabled = true;
+  setMsg($("msg"), "Reading LinkedIn alert emails from your inbox…");
+  try {
+    const r = await api("/api/ingest/gmail", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ days: 7, rank: $("rank-on-add").checked }),
+    });
+    const parts = [
+      `Scanned ${r.emails_scanned} email${r.emails_scanned === 1 ? "" : "s"}`,
+      `${r.new_job_ids.length} new`,
+      `${r.duplicates} duplicate${r.duplicates === 1 ? "" : "s"}`,
+    ];
+    const cls = r.warnings.length ? "warn" : "ok";
+    setMsg($("msg"), parts.join(" — ") +
+      (r.warnings.length ? ". " + r.warnings.join(" | ") : "."), cls);
+    await refreshAll();
   } catch (e) {
     setMsg($("msg"), "Error: " + e.message, "err");
   } finally { btn.disabled = false; }

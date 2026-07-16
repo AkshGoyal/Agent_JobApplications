@@ -11,7 +11,9 @@ before making design decisions).
 - No automated submission of applications, anywhere.
 - No LinkedIn automation of any kind (no scraping, no messaging, no login).
   Phase 1's only source is *manual paste*: I copy a JD from LinkedIn myself.
-- No email sending.
+- No email sending. (Reading is allowed and scoped: `ingest gmail` reads
+  LinkedIn job-alert emails from my own inbox over read-only IMAP — it never
+  sends, marks, moves, or deletes anything, and never touches linkedin.com.)
 - No hosted/multi-user deployment. (The original "no web UI" rule was lifted
   2026-07-11: a *local, single-user* web UI in `web/` wraps the same pipeline
   functions as the CLI.)
@@ -40,7 +42,7 @@ llm.py            # the ONE wrapper for all LLM calls (templates, parsing, loggi
 profile_kb.py     # loads profile/ files — the ONLY source of truth about me
 prompts/          # readable prompt template files (never scattered f-strings)
 db/               # migrations, connection, repository functions
-sources/          # one module per job source (Phase 1: manual_paste)
+sources/          # one module per job source: manual_paste, gmail_alerts
 pipeline/         # normalize → dedup → ingest → rank
 cli/              # Typer app: ingest paste, rank, list, show, status, status-report, tailor, answer, deadline
 web/              # FastAPI app + single static page — same pipeline, in the browser
@@ -59,6 +61,7 @@ automatically.
 
 ```bash
 python -m cli.main ingest paste --url <URL> [--file jd.txt] [--rank]
+python -m cli.main ingest gmail [--days 7] [--rank]   # LinkedIn alert emails, read-only IMAP
 python -m cli.main rank [JOB_ID]
 python -m cli.main list [--min-score 70] [--status discovered]
 python -m cli.main show <JOB_ID>
@@ -154,6 +157,27 @@ pytest                     # offline, mocked LLM — no key needed
 | `JOBSEARCH_MODEL_ANSWER` | global | application Q&A (`answer`) |
 | `JOBSEARCH_MAX_TOKENS_TAILOR` | `16384` | output-token cap for both tailor calls |
 | `JOBSEARCH_DB` | `jobsearch.db` | SQLite path |
+| `GMAIL_ADDRESS` | — | Gmail address for `ingest gmail` (read-only IMAP) |
+| `GMAIL_APP_PASSWORD` | — | Google app password for `ingest gmail` |
+| `JOBSEARCH_ALERT_SENDER` | `jobalerts-noreply@linkedin.com` | sender that identifies alert emails |
+
+### Gmail setup for `ingest gmail` (one-time, ~5 minutes)
+
+1. Enable **2-Step Verification** on your Google account (required for app
+   passwords): myaccount.google.com/security.
+2. Create an **app password** at myaccount.google.com/apppasswords (name it
+   e.g. "jobsearch") and copy the 16-character password.
+3. Export both env vars where you run the app (shell, or a Codespaces secret):
+   `export GMAIL_ADDRESS=you@gmail.com` and
+   `export GMAIL_APP_PASSWORD=<the 16 chars>`.
+4. Make sure IMAP is enabled in Gmail (Settings → Forwarding and POP/IMAP).
+
+The mailbox is always opened **read-only** — nothing is ever sent, marked
+read, moved, or deleted. Job URLs found in alert emails are stored as labels
+only and never fetched. Alert jobs carry only the email's snippet (alert
+emails never include the full JD), so their scores are indicative — the
+stored description says so explicitly. Full-JD enrichment of an alert job is
+a possible follow-up feature.
 
 To cut costs, `gemini-3.1-flash-lite` (~6x cheaper) is a good fit for
 extract/rank/answer — but do **not** use `gemini-2.5-flash-lite`

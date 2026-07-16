@@ -1,6 +1,7 @@
 """Job search assistant CLI.
 
     python -m cli.main ingest paste --url <URL> [--file jd.txt] [--rank]
+    python -m cli.main ingest gmail [--days 7] [--rank]
     python -m cli.main rank [JOB_ID]
     python -m cli.main list [--min-score 70] [--status discovered]
     python -m cli.main show <JOB_ID>
@@ -24,6 +25,7 @@ from pipeline import answer as answer_pipeline
 from pipeline import ingest as ingest_pipeline
 from pipeline import rank as rank_pipeline
 from pipeline import tailor as tailor_pipeline
+from sources import gmail_alerts
 
 app = typer.Typer(no_args_is_help=True, help="Personal job search assistant (Phase 1).")
 ingest_app = typer.Typer(help="Capture jobs into the database.")
@@ -106,6 +108,46 @@ def ingest_paste(
             raise typer.Exit(1)
         typer.echo("Ranked:")
         _print_ranked(ranked)
+
+
+@ingest_app.command("gmail")
+def ingest_gmail(
+    days: int = typer.Option(7, "--days", help="Look back this many days of alert emails."),
+    rank: bool = typer.Option(False, "--rank", help="Rank each new job right after storing."),
+):
+    """Pull LinkedIn job-alert emails from your Gmail inbox (read-only IMAP)."""
+    _require_api_key()
+    if not config.gmail_configured():
+        typer.echo(
+            f"error: Gmail is not configured — export {config.GMAIL_ADDRESS_ENV_VAR} "
+            f"and {config.GMAIL_APP_PASSWORD_ENV_VAR} first (see CLAUDE.md).",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    conn = _connect()
+    try:
+        result = gmail_alerts.ingest_alerts(conn, days=days)
+    except (ValueError, llm.LLMError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(
+        f"Scanned {result.emails_scanned} alert email(s): "
+        f"{len(result.new_job_ids)} new job(s), {result.duplicates} duplicate(s)."
+    )
+    for job_id in result.new_job_ids:
+        job = repo.get_job(conn, job_id)
+        typer.echo(f"  job {job_id}: {job['company_name']} — {job['title']}")
+
+    if rank and result.new_job_ids:
+        typer.echo("Ranking new jobs (snippet-based — paste full JD for accuracy):")
+        for job_id in result.new_job_ids:
+            try:
+                ranked = rank_pipeline.rank_job(conn, job_id)
+                typer.echo(f"  job {job_id}: score {ranked.score}")
+            except llm.LLMError as exc:
+                typer.echo(f"  job {job_id}: ranking failed ({exc})", err=True)
 
 
 @app.command()
