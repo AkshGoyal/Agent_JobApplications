@@ -23,6 +23,7 @@ import llm
 from db import database, repo
 from pipeline import answer as answer_pipeline
 from pipeline import ingest as ingest_pipeline
+from pipeline import opportunities as opportunities_pipeline
 from pipeline import rank as rank_pipeline
 from pipeline import tailor as tailor_pipeline
 from sources import gmail_alerts, manual_paste
@@ -70,6 +71,14 @@ class AnswerRequest(BaseModel):
 class GmailIngestRequest(BaseModel):
     days: int = 7
     rank: bool = False
+
+
+class OpportunityScanRequest(BaseModel):
+    focus: str | None = None
+
+
+class OpportunityStatusRequest(BaseModel):
+    status: str
 
 
 def _ingest_and_maybe_rank(
@@ -280,6 +289,43 @@ def api_list_assets(job_id: int):
         if repo.get_job(conn, job_id) is None:
             raise HTTPException(status_code=404, detail=f"no job with id {job_id}")
         return [dict(row) for row in repo.list_generated_assets(conn, job_id)]
+
+
+@app.get("/api/opportunities")
+def api_list_opportunities(status: str | None = None):
+    with closing(database.connect()) as conn:
+        return [dict(row) for row in repo.list_opportunities(conn, status=status)]
+
+
+@app.post("/api/opportunities/scan")
+def api_scan_opportunities(req: OpportunityScanRequest):
+    _require_api_key()
+    with closing(database.connect()) as conn:
+        try:
+            result = opportunities_pipeline.scan(conn, focus=req.focus)
+        except llm.LLMError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        new_ids = set(result.new_ids)
+        items = [dict(row) for row in repo.list_opportunities(conn) if row["id"] in new_ids]
+        return {
+            "overview": result.overview,
+            "new_ids": result.new_ids,
+            "duplicates": result.duplicates,
+            "digest_path": str(result.digest_path),
+            "items": items,
+        }
+
+
+@app.post("/api/opportunities/{opportunity_id}/status")
+def api_set_opportunity_status(opportunity_id: int, req: OpportunityStatusRequest):
+    with closing(database.connect()) as conn:
+        try:
+            repo.set_opportunity_status(conn, opportunity_id, req.status)
+        except ValueError as exc:
+            code = 404 if "no opportunity" in str(exc) else 400
+            raise HTTPException(status_code=code, detail=str(exc))
+        rows = repo.list_opportunities(conn)
+        return next(dict(r) for r in rows if r["id"] == opportunity_id)
 
 
 def main() -> None:

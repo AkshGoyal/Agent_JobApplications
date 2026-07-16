@@ -10,6 +10,9 @@
     python -m cli.main tailor <JOB_ID>
     python -m cli.main answer <JOB_ID> "question text"
     python -m cli.main deadline <JOB_ID> <YYYY-MM-DD|clear>
+    python -m cli.main opportunities scan [--focus "text"]
+    python -m cli.main opportunities list [--status new]
+    python -m cli.main opportunities status <ID> <new|saved|dismissed>
 """
 
 import sys
@@ -23,6 +26,7 @@ import llm
 from db import database, repo
 from pipeline import answer as answer_pipeline
 from pipeline import ingest as ingest_pipeline
+from pipeline import opportunities as opportunities_pipeline
 from pipeline import rank as rank_pipeline
 from pipeline import tailor as tailor_pipeline
 from sources import gmail_alerts
@@ -30,6 +34,8 @@ from sources import gmail_alerts
 app = typer.Typer(no_args_is_help=True, help="Personal job search assistant (Phase 1).")
 ingest_app = typer.Typer(help="Capture jobs into the database.")
 app.add_typer(ingest_app, name="ingest")
+opportunities_app = typer.Typer(help="Market-intelligence scan: startups, AI news, learning gaps.")
+app.add_typer(opportunities_app, name="opportunities")
 
 
 def _connect():
@@ -328,6 +334,59 @@ def show(job_id: int = typer.Argument(..., help="Job id (see `list`).")):
     typer.echo(excerpt)
     if len(text) > len(excerpt):
         typer.echo(f"[... {len(text) - len(excerpt)} more characters — stored in full]")
+
+
+@opportunities_app.command("scan")
+def opportunities_scan(
+    focus: Optional[str] = typer.Option(
+        None, "--focus", help="Steer the scan (e.g. 'quick commerce AI startups')."
+    ),
+):
+    """Search-grounded scan for startups, AI developments, and learning gaps."""
+    _require_api_key()
+    conn = _connect()
+    try:
+        result = opportunities_pipeline.scan(conn, focus=focus)
+    except llm.LLMError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(result.overview)
+    typer.echo(
+        f"{len(result.new_ids)} new item(s), {result.duplicates} already seen. "
+        f"Digest: {result.digest_path}"
+    )
+
+
+@opportunities_app.command("list")
+def opportunities_list(
+    status: Optional[str] = typer.Option(None, "--status", help="Filter by status."),
+):
+    """List stored opportunities (newest first)."""
+    rows = repo.list_opportunities(_connect(), status=status)
+    if not rows:
+        typer.echo("No opportunities match.")
+        return
+    for row in rows:
+        typer.echo(f"[{row['id']}] ({row['kind']}, {row['status']}) {row['title']}")
+        typer.echo(f"    {row['summary']}")
+        if row["source_url"]:
+            typer.echo(f"    source: {row['source_url']}")
+
+
+@opportunities_app.command("status")
+def opportunities_status(
+    opportunity_id: int = typer.Argument(..., help="Opportunity id (see `opportunities list`)."),
+    new_status: str = typer.Argument(..., help="One of: " + ", ".join(repo.OPPORTUNITY_STATUSES)),
+):
+    """Mark an opportunity as new, saved, or dismissed."""
+    conn = _connect()
+    try:
+        repo.set_opportunity_status(conn, opportunity_id, new_status)
+    except ValueError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"Opportunity {opportunity_id} -> {new_status}")
 
 
 if __name__ == "__main__":
