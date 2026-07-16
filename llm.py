@@ -35,6 +35,13 @@ _BAD_FINISH_REASONS = {"SAFETY", "RECITATION", "MAX_TOKENS", "PROHIBITED_CONTENT
 
 _client: genai.Client | None = None
 
+# Symbolic tool names -> actual google-genai Tool objects. Keeps SDK-specific
+# types out of pipeline call sites (per this module's one-wrapper contract) —
+# a caller passes tools="web_search", never types.Tool(...) directly.
+_TOOLS_BY_NAME = {
+    "web_search": [types.Tool(google_search=types.GoogleSearch())],
+}
+
 
 class LLMError(RuntimeError):
     """Raised when an LLM call fails to produce valid structured output."""
@@ -94,6 +101,7 @@ def call(
     client: genai.Client | None = None,
     model: str | None = None,
     max_tokens: int | None = None,
+    tools: str | None = None,
     **variables: object,
 ) -> T:
     """Render a prompt template and return a validated ``output_model`` instance.
@@ -101,11 +109,17 @@ def call(
     ``client`` is injectable so tests can pass a mock — tests must never hit
     the live API. ``model``/``max_tokens`` let each pipeline step pick its own
     settings (config.MODEL_EXTRACT, MAX_TOKENS_TAILOR, ...); omitted, they
-    fall back to the global config.MODEL / config.MAX_TOKENS.
+    fall back to the global config.MODEL / config.MAX_TOKENS. ``tools`` names
+    a symbolic tool set (currently only "web_search") for search-grounded
+    calls — Gemini 3 models support combining tools with response_schema in
+    one call. Callers never construct google-genai Tool objects themselves,
+    keeping the SDK contained to this module; every caller that omits
+    ``tools`` behaves exactly as before.
     """
     client = client or get_client()
     model = model or config.MODEL
     max_tokens = max_tokens or config.MAX_TOKENS
+    tool_objects = _TOOLS_BY_NAME[tools] if tools else None
     prompt = render_prompt(prompt_name, **variables)
     response = client.models.generate_content(
         model=model,
@@ -114,6 +128,7 @@ def call(
             response_mime_type="application/json",
             response_schema=output_model,
             max_output_tokens=max_tokens,
+            tools=tool_objects,
         ),
     )
 
