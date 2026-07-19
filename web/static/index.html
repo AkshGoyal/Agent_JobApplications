@@ -79,19 +79,19 @@
   .inline button { margin-top: 0; }
   .hint { color: var(--muted); font-size: .85rem; }
 
-  #tracker-groups details {
+  #pipeline-groups details {
     border: 1px solid var(--line); border-radius: 6px; margin-bottom: .6rem;
   }
-  #tracker-groups summary {
+  #pipeline-groups summary {
     cursor: pointer; padding: .5rem .75rem; font-weight: 600;
     text-transform: capitalize;
   }
-  #tracker-groups table { margin-top: 0; }
-  #tracker-groups tbody tr.tracker-row { cursor: pointer; }
-  #tracker-groups tbody tr.tracker-row:hover {
+  #pipeline-groups table { margin-top: 0; }
+  #pipeline-groups tbody tr.tracker-row { cursor: pointer; }
+  #pipeline-groups tbody tr.tracker-row:hover {
     background: color-mix(in srgb, var(--accent) 10%, transparent);
   }
-  #tracker-groups tr.tracker-expand td {
+  #pipeline-groups tr.tracker-expand td {
     background: var(--bg); padding: .75rem; border-bottom: 1px solid var(--line);
   }
   .deadline-badge {
@@ -129,8 +129,7 @@
 <h1>Job Search Assistant</h1>
 <nav id="quicknav">
   <a href="#add-section">Add job</a>
-  <a href="#jobs-section">Jobs</a>
-  <a href="#tracker-section">Tracker</a>
+  <a href="#pipeline-section">Pipeline</a>
   <a href="#opportunities-section">Opportunities</a>
 </nav>
 <div id="funnel">loading…</div>
@@ -152,32 +151,29 @@
   <div id="msg"></div>
 </section>
 
-<section id="jobs-section">
-  <h2>Jobs</h2>
-  <p class="hint">Every job, sorted by score. Click a row to open full details: rationale, description, generate materials, ask questions.</p>
+<section id="pipeline-section">
+  <h2>Pipeline</h2>
+  <p class="hint">
+    Every job in three stages — <strong>To apply</strong> (still working toward
+    applying), <strong>Applied &amp; in progress</strong> (submitted, in process,
+    interviewing, offer), and <strong>Closed</strong> (rejected or dropped).
+    Click any row for materials, status, and deadline actions; deadlines show
+    amber within 3 days, red once overdue.
+  </p>
   <div class="row">
     <div class="narrow">
       <label for="min-score">Min score</label>
       <input type="number" id="min-score" min="0" max="100" placeholder="e.g. 70">
     </div>
-    <div class="narrow">
-      <label for="status-filter">Status</label>
-      <select id="status-filter"><option value="">all</option></select>
+    <div>
+      <label for="search">Search</label>
+      <input type="text" id="search" placeholder="company or title">
     </div>
     <div class="narrow">
       <button id="refresh-btn" class="secondary">Refresh</button>
     </div>
   </div>
-  <table>
-    <thead><tr><th>id</th><th>score</th><th>company</th><th>title</th><th>location</th><th>status</th></tr></thead>
-    <tbody id="jobs-body"><tr><td colspan="6" class="hint">loading…</td></tr></tbody>
-  </table>
-</section>
-
-<section id="tracker-section">
-  <h2>Tracker</h2>
-  <p class="hint">The same jobs, grouped by status with deadlines. Click a row for quick materials/status/deadline actions without leaving this view.</p>
-  <div id="tracker-groups"><p class="hint">loading…</p></div>
+  <div id="pipeline-groups"><p class="hint">loading…</p></div>
 </section>
 
 <section id="opportunities-section">
@@ -265,42 +261,90 @@ async function loadReport() {
   $("funnel").textContent = r.total
     ? `${r.total} job${r.total === 1 ? "" : "s"} — ` + parts.join(" · ")
     : "No jobs yet — paste your first one below.";
-  for (const sel of [$("status-filter"), $("status-set")]) {
-    const keep = sel.value;
-    sel.length = sel === $("status-filter") ? 1 : 0;
-    for (const s of r.lifecycle) sel.add(new Option(s, s));
-    sel.value = keep;
-  }
+  const sel = $("status-set");
+  const keep = sel.value;
+  sel.length = 0;
+  for (const s of r.lifecycle) sel.add(new Option(s, s));
+  sel.value = keep;
 }
 
-async function loadJobs() {
-  const q = new URLSearchParams();
-  if ($("min-score").value !== "") q.set("min_score", $("min-score").value);
-  if ($("status-filter").value) q.set("status", $("status-filter").value);
-  const jobs = await api("/api/jobs?" + q);
-  const tbody = $("jobs-body");
-  tbody.textContent = "";
+const PIPELINE_BUCKETS = [
+  { label: "To apply", statuses: ["discovered", "ranked", "shortlisted", "materials_ready"] },
+  { label: "Applied & in progress", statuses: ["applied", "in_process", "interview", "offer"] },
+  { label: "Closed", statuses: ["rejected", "dropped"] },
+];
+
+async function loadPipeline() {
+  const jobs = await api("/api/jobs");
+  const container = $("pipeline-groups");
+  container.textContent = "";
   if (!jobs.length) {
-    const tr = tbody.insertRow(); const td = tr.insertCell();
-    td.colSpan = 6; td.className = "hint"; td.textContent = "No jobs match.";
+    container.innerHTML = '<p class="hint">No jobs yet — add one above.</p>';
     return;
   }
-  for (const j of jobs) {
-    const tr = tbody.insertRow();
-    tr.dataset.id = j.id;
-    if (j.id === selectedId) tr.className = "selected";
-    tr.insertCell().textContent = j.id;
-    const sc = tr.insertCell(); sc.className = "score";
-    sc.textContent = j.relevance_score ?? "–";
-    tr.insertCell().textContent = j.company_name || "";
-    tr.insertCell().textContent = j.title || "";
-    tr.insertCell().textContent = j.location || "–";
-    const st = tr.insertCell();
-    const pill = document.createElement("span");
-    pill.className = "status-pill"; pill.textContent = j.status;
-    st.appendChild(pill);
-    tr.addEventListener("click", () => openDetail(j.id));
+
+  const minScore = $("min-score").value === "" ? null : Number($("min-score").value);
+  const search = $("search").value.trim().toLowerCase();
+  const visible = jobs.filter(j => {
+    if (minScore != null && (j.relevance_score ?? -1) < minScore) return false;
+    if (search && !`${j.company_name || ""} ${j.title || ""}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  let anyShown = false;
+  for (const bucket of PIPELINE_BUCKETS) {
+    const group = visible
+      .filter(j => bucket.statuses.includes(j.status))
+      .sort((a, b) => (b.relevance_score ?? -1) - (a.relevance_score ?? -1));
+
+    const details = document.createElement("details");
+    details.open = true;
+    const summary = document.createElement("summary");
+    summary.textContent = `${bucket.label} (${group.length})`;
+    details.appendChild(summary);
+
+    if (!group.length) {
+      const p = document.createElement("p");
+      p.className = "hint"; p.style.padding = "0 .75rem .5rem";
+      p.textContent = "Nothing here yet.";
+      details.appendChild(p);
+    } else {
+      anyShown = true;
+      const table = document.createElement("table");
+      const thead = table.createTHead().insertRow();
+      for (const h of ["score", "company", "title", "status", "deadline"]) {
+        const th = document.createElement("th"); th.textContent = h; thead.appendChild(th);
+      }
+      const tbody = table.createTBody();
+      for (const j of group) {
+        const tr = tbody.insertRow();
+        tr.className = "tracker-row";
+        tr.dataset.jobId = j.id;
+        const sc = tr.insertCell(); sc.className = "score";
+        sc.textContent = j.relevance_score ?? "–";
+        tr.insertCell().textContent = j.company_name || "";
+        tr.insertCell().textContent = j.title || "";
+        const stCell = tr.insertCell();
+        const pill = document.createElement("span");
+        pill.className = "status-pill"; pill.textContent = j.status;
+        stCell.appendChild(pill);
+        const dlCell = tr.insertCell();
+        const info = deadlineInfo(j.application_deadline);
+        const badge = document.createElement("span");
+        badge.className = "deadline-badge" + (info.cls ? " " + info.cls : "");
+        badge.textContent = info.text;
+        dlCell.appendChild(badge);
+
+        const expandTr = tbody.insertRow();
+        expandTr.className = "tracker-expand"; expandTr.hidden = true;
+        const expandTd = expandTr.insertCell(); expandTd.colSpan = 5;
+        tr.addEventListener("click", () => toggleJobRow(j.id, tr, expandTr, expandTd));
+      }
+      details.appendChild(table);
+    }
+    container.appendChild(details);
   }
+  if (!anyShown) container.innerHTML = '<p class="hint">No jobs match the current filter.</p>';
 }
 
 async function openDetail(id) {
@@ -337,8 +381,8 @@ async function openDetail(id) {
   $("tailor-warnings").textContent = "";
   setMsg($("answer-msg"), "");
   $("question").value = "";
-  document.querySelectorAll("#jobs-body tr").forEach(tr =>
-    tr.classList.toggle("selected", Number(tr.dataset.id) === id));
+  document.querySelectorAll("#pipeline-groups tr.tracker-row").forEach(tr =>
+    tr.classList.toggle("selected", Number(tr.dataset.jobId) === id));
   await loadLatestAssets(id);
   $("detail").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -376,73 +420,15 @@ function downloadText(filename, text) {
   URL.revokeObjectURL(url);
 }
 
-async function loadTracker() {
-  const jobs = await api("/api/jobs");
-  const container = $("tracker-groups");
-  container.textContent = "";
-  const byStatus = {};
-  for (const j of jobs) (byStatus[j.status] ??= []).push(j);
-
-  if (!jobs.length) {
-    container.innerHTML = '<p class="hint">No jobs yet.</p>';
-    return;
-  }
-
-  for (const stage of LIFECYCLE) {
-    const group = byStatus[stage] || [];
-    if (!group.length) continue;
-
-    const details = document.createElement("details");
-    details.open = true;
-    const summary = document.createElement("summary");
-    summary.textContent = `${stage} (${group.length})`;
-    details.appendChild(summary);
-
-    const table = document.createElement("table");
-    const thead = table.createTHead().insertRow();
-    for (const h of ["company", "title", "score", "deadline"]) {
-      const th = document.createElement("th"); th.textContent = h; thead.appendChild(th);
-    }
-    const tbody = table.createTBody();
-
-    for (const j of group) {
-      const tr = tbody.insertRow();
-      tr.className = "tracker-row";
-      tr.dataset.jobId = j.id;
-      tr.insertCell().textContent = j.company_name || "";
-      tr.insertCell().textContent = j.title || "";
-      const scoreCell = tr.insertCell(); scoreCell.className = "score";
-      scoreCell.textContent = j.relevance_score ?? "–";
-      const dlCell = tr.insertCell();
-      const info = deadlineInfo(j.application_deadline);
-      const badge = document.createElement("span");
-      badge.className = "deadline-badge" + (info.cls ? " " + info.cls : "");
-      badge.textContent = info.text;
-      dlCell.appendChild(badge);
-
-      const expandTr = tbody.insertRow();
-      expandTr.className = "tracker-expand";
-      expandTr.hidden = true;
-      const expandTd = expandTr.insertCell();
-      expandTd.colSpan = 4;
-
-      tr.addEventListener("click", () => toggleTrackerRow(j.id, tr, expandTr, expandTd));
-    }
-
-    details.appendChild(table);
-    container.appendChild(details);
-  }
-}
-
-async function toggleTrackerRow(jobId, tr, expandTr, expandTd) {
+async function toggleJobRow(jobId, tr, expandTr, expandTd) {
   if (!expandTr.hidden) { expandTr.hidden = true; return; }
   expandTr.hidden = false;
   if (expandTd.dataset.loaded) return;
   expandTd.dataset.loaded = "1";
-  await renderTrackerExpand(jobId, expandTd);
+  await renderJobExpand(jobId, expandTd);
 }
 
-async function renderTrackerExpand(jobId, expandTd) {
+async function renderJobExpand(jobId, expandTd) {
   expandTd.textContent = "Loading…";
   const [job, assets] = await Promise.all([
     api(`/api/jobs/${jobId}`),
@@ -490,7 +476,7 @@ async function renderTrackerExpand(jobId, expandTd) {
         body: JSON.stringify({ deadline: value }),
       });
       setMsg(controlMsg, value ? "Deadline set." : "Deadline cleared.", "ok");
-      await loadTracker();
+      await loadPipeline();
     } catch (e) { setMsg(controlMsg, "Error: " + e.message, "err"); }
   };
   deadlineBtn.addEventListener("click", () => setDeadline(deadlineInput.value || null));
@@ -588,7 +574,7 @@ async function loadOpportunities() {
   }
 }
 
-async function refreshAll() { await loadReport(); await loadJobs(); await loadTracker(); await loadOpportunities(); }
+async function refreshAll() { await loadReport(); await loadPipeline(); await loadOpportunities(); }
 
 $("add-btn").addEventListener("click", async () => {
   const btn = $("add-btn");
@@ -687,8 +673,8 @@ $("tailor-btn").addEventListener("click", async () => {
         "Warnings: " + r.warnings.join(" | ");
     }
     await refreshAll();
-    document.querySelectorAll("#jobs-body tr").forEach(tr =>
-      tr.classList.toggle("selected", Number(tr.dataset.id) === selectedId));
+    document.querySelectorAll("#pipeline-groups tr.tracker-row").forEach(tr =>
+      tr.classList.toggle("selected", Number(tr.dataset.jobId) === selectedId));
   } catch (e) {
     setMsg($("tailor-msg"), "Error: " + e.message, "err");
   } finally { btn.disabled = false; }
@@ -737,8 +723,8 @@ $("opp-scan-btn").addEventListener("click", async () => {
 $("opp-status-filter").addEventListener("change", loadOpportunities);
 
 $("refresh-btn").addEventListener("click", refreshAll);
-$("status-filter").addEventListener("change", loadJobs);
-$("min-score").addEventListener("change", loadJobs);
+$("min-score").addEventListener("input", loadPipeline);
+$("search").addEventListener("input", loadPipeline);
 
 refreshAll().catch(e => setMsg($("msg"), "Error: " + e.message, "err"));
 </script>

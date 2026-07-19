@@ -89,15 +89,18 @@ python -m web.app                      # http://localhost:8000 (Codespaces auto-
 python -m uvicorn web.app:app --host 0.0.0.0 --port 8000
 ```
 
-One static page over the same pipeline: paste a JD (add & rank), browse and
-filter the ranked table, open a job's detail/rationale, change its status,
-generate/view materials, ask application questions, and see the funnel. The
-**Tracker** section groups jobs by lifecycle status (collapsible per stage);
-each row expands to a deadline badge (amber ≤3 days out, red overdue) plus
-inline status/deadline controls and copy/download buttons for any generated
-CV bullets and cover letter. The web layer (`web/app.py`) contains no
-business logic — it must stay a thin JSON wrapper over `pipeline/` and
-`db/repo.py`.
+One static page over the same pipeline: paste a JD (add & rank), then work
+jobs through the **Pipeline** board, which groups every job into three
+stages — *To apply* (discovered/ranked/shortlisted/materials_ready),
+*Applied & in progress* (applied/in_process/interview/offer), and *Closed*
+(rejected/dropped) — filterable by min-score and a company/title search.
+Each row shows a deadline badge (amber ≤3 days out, red overdue) and expands
+inline to status/deadline controls, copy/download buttons for any generated
+CV bullets and cover letter, and an "Open full details" jump to the detail
+panel (rationale, description, generate materials, ask application
+questions). A funnel summary and the Opportunities section round out the
+page. The web layer (`web/app.py`) contains no business logic — it must stay
+a thin JSON wrapper over `pipeline/` and `db/repo.py`.
 
 `ingest paste` reads the JD from `--file` or stdin (paste, then Ctrl-D). It
 always **stores first, ranks after** — a failed LLM call must never lose a
