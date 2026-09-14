@@ -1,8 +1,9 @@
 # Portfolio draft — Agent_JobApplications
 
 Draft material for review. Everything below is derived from the repo's code,
-commit history, README, and config — anything I couldn't verify from those
-sources is marked **[INFERRED]**, and open questions are listed at the end.
+commit history, README, and config, plus the repo owner's answers (noted
+inline) to the questions raised in the previous draft — anything else I
+couldn't verify is marked **[INFERRED]**.
 
 ---
 
@@ -30,6 +31,11 @@ search, not as a multi-tenant product.
 
 ### What I built
 
+**How it was built (per the repo owner):** Aksh wrote the product spec and
+directed Claude Code to build it, reviewing and testing everything along
+the way — consistent with the working agreements recorded in `CLAUDE.md`
+(plan-mode-first, his review before code lands).
+
 **In plain terms:** A tool that takes a job posting — pasted in, captured
 with a one-click Chrome extension, or picked up automatically from LinkedIn
 job-alert emails — and uses an LLM to pull out the structured details
@@ -39,10 +45,19 @@ cover letter, and answers to application-form questions, all grounded
 strictly in a profile you maintain (`profile/facts.yaml`,
 `narratives.md`, `canned_answers.yaml`, your CV). A human reviews and sends
 everything manually — the tool never submits an application or sends an
-email itself. There's also a separate "Opportunities" feature: a
-web-search-grounded scan for relevant startups and AI developments, unrelated
-to the job-tracking pipeline, which runs weekly via a scheduled GitHub
-Action and posts its digest as a GitHub Issue.
+email itself.
+
+**Feature spotlight — the Opportunities digest.** Separate from the
+job-tracking pipeline entirely, `opportunities scan` makes one
+web-search-grounded LLM call (Gemini's own search tool plus structured
+output) to surface things a job tracker wouldn't otherwise catch: newly
+launched or funded AI startups, notable AI developments, concrete learning
+gaps, and entrepreneurship angles — all filtered through the same profile
+and every item required to be grounded in a real search result, never
+invented. It's deduped against prior scans, runs on demand from the CLI or
+web UI, and also runs automatically every week via a scheduled GitHub
+Action (`opportunity-scan.yml`) that posts the digest as a GitHub Issue —
+a standing market-intelligence habit, not just a one-off query.
 
 **Architecture:**
 ```
@@ -112,7 +127,10 @@ live model calls (`.github/workflows/ci.yml`).
 
 ### Outcome
 
-_TODO — to be filled in._
+_TODO — to be filled in._ Confirmed so far: the repo owner is still using
+this actively in his own job search (not a one-off/point-in-time build),
+and has no usage numbers to share — it was built and is used for his own
+personal job search, not tracked for metrics.
 
 ### What I'd do next
 
@@ -128,22 +146,17 @@ worth noting as a practical next step independent of new features.
 
 ---
 
-## 3. Questions for Aksh
+## 3. Questions for Aksh — resolved
 
-1. Every generation commit in this history is authored `Claude
-   <noreply@anthropic.com>`, and `CLAUDE.md` lays out working agreements for
-   Claude Code (plan mode first, your review before code, etc.). How do you
-   want your role described to a hiring manager — spec author & reviewer
-   directing an AI coding assistant, hands-on implementer, or something
-   between? This changes how "What I built" should be framed, and I didn't
-   want to guess.
-2. Is this still an active part of your job search, or was it a
-   point-in-time build? That affects how "Outcome" should be framed once you
-   fill it in.
-3. Is there any real usage you can share (roughly how many postings
-   ingested, materials generated, applications sent)? Nothing like that is
-   in the repo itself — `output/` and the SQLite DB are gitignored — so I
-   have no basis to estimate it.
-4. Should the "Opportunities" weekly market-intelligence digest be
-   highlighted as a distinct feature in the case study, or treated as a
-   minor add-on to the main job-tracking pipeline?
+The previous draft's four questions are now answered and incorporated above
+(authorship/framing in "What I built", ongoing-use and no-metrics note in
+Outcome, Opportunities promoted to its own spotlight). Recorded here for
+traceability:
+
+1. Role: wrote the spec, directed Claude Code to build it, reviewed and
+   tested everything along the way.
+2. Still active: yes, still using it in his job search now.
+3. Usage numbers: none to share — built and used for his own personal job
+   search, not tracked for metrics.
+4. Opportunities digest: highlight as a distinct feature, not a minor
+   add-on — done above.
