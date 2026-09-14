@@ -19,6 +19,13 @@ venv/
 *.egg-info/
 .pytest_cache/
 
+# Node (Chrome extension tooling, if ever added)
+node_modules/
+
+# Logs
+*.log
+logs/
+
 # OS / editor noise
 .DS_Store
 .idea/
